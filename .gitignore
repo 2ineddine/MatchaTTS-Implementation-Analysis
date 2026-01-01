@@ -1,0 +1,7 @@
+.venv
+outputs_ljspeech
+outputs_vctk*
+checkpoints/
+vocoder/
+ckpt*
+synth_output/
