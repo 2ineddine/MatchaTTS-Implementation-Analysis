@@ -5,3 +5,4 @@ checkpoints/
 vocoder/
 ckpt*
 synth_output/
+data/
