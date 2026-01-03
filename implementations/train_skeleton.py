@@ -110,8 +110,15 @@ class TextMelDataset(Dataset):
         return len(self.data)
 
     def __getitem__(self, idx):
-        audio_path, text, spk_id = self.data[idx]
-        spk_id = int(spk_id)
+        parts = self.data[idx]
+
+        # Handle both formats: "path|text|spk_id" or "path|text"
+        if len(parts) >= 3:
+            audio_path, text, spk_id = parts[0], parts[1], parts[2]
+            spk_id = int(spk_id)
+        else:
+            audio_path, text = parts[0], parts[1]
+            spk_id = None
 
         # 1. Load audio
         audio, sr = torchaudio.load(self.data_dir / audio_path)
@@ -190,8 +197,8 @@ if __name__ == "__main__":
 
     # 1. Create dataset
     train_dataset = TextMelDataset(
-        filelist_path="data/train_filelist.txt",
-        data_dir="data/LJSpeech-1.1",
+        filelist_path="../LJSpeech-1.1/train.txt",
+        data_dir="../LJSpeech-1.1",
         n_mels=80
     )
 

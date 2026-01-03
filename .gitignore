@@ -5,4 +5,4 @@ checkpoints/
 vocoder/
 ckpt*
 synth_output/
-data/
+LJSpeech-1.1/
