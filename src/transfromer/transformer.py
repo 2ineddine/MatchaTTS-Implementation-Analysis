@@ -2,20 +2,19 @@ from typing import Any, Dict, Optional
 
 import torch
 import torch.nn as nn  # pylint: disable=consider-using-from-import
-from diffusers.models.attention import (
+from activation_function import (
     GEGLU,
     GELU,
     AdaLayerNorm,
     AdaLayerNormZero,
     ApproximateGELU,
 )
-from diffusers.models.attention_processor import Attention
-from diffusers.models.lora import LoRACompatibleLinear
+from Attention import Attention                                   # Now it uses our implementation 
+from lora import LoRACompatibleLinear          # Now it uses our implementation
 from diffusers.utils.torch_utils import maybe_allow_in_graph
 
 
 class SnakeBeta(nn.Module):
-    # ZB : this class is for create a layer and its activation function, each perceptrion output has its parameter alpha and beta
     """
     A modified Snake function which uses separate parameters for the magnitude of the periodic components
     Shape:
@@ -35,7 +34,6 @@ class SnakeBeta(nn.Module):
 
     def __init__(self, in_features, out_features, alpha=1.0, alpha_trainable=True, alpha_logscale=True):
         """
-        SnakeBeta(x) = x + (1/β) * sin²(αx)
         Initialization.
         INPUT:
             - in_features: shape of the input
@@ -47,13 +45,12 @@ class SnakeBeta(nn.Module):
         """
         super().__init__()
         self.in_features = out_features if isinstance(out_features, list) else [out_features]
-        self.proj = LoRACompatibleLinear(in_features, out_features) # add the LoRA-compatible, is like adding two layer before the prediction to fine-tune the output model ! 
-        # for the last layer W_last + A@B, and  the matrix A and B are trainable 
+        self.proj = LoRACompatibleLinear(in_features, out_features)
 
         # initialize alpha
         self.alpha_logscale = alpha_logscale
         if self.alpha_logscale:  # log scale alphas initialized to zeros
-            self.alpha = nn.Parameter(torch.zeros(self.in_features) * alpha) #each neuron get its alpha and beta ! 
+            self.alpha = nn.Parameter(torch.zeros(self.in_features) * alpha)
             self.beta = nn.Parameter(torch.zeros(self.in_features) * alpha)
         else:  # linear scale alphas initialized to ones
             self.alpha = nn.Parameter(torch.ones(self.in_features) * alpha)
@@ -139,9 +136,7 @@ class FeedForward(nn.Module):
 
 @maybe_allow_in_graph
 class BasicTransformerBlock(nn.Module):
-    # Zb : the transformer herer get the noisy image and try to denoise it 
-    # the denoising process works using the 1000 step each step has 1024 parameters, so we've [1000,1024] parameters to tweak to help the model denoising the image !
-    """
+    r"""
     A basic Transformer block.
 
     Parameters:
@@ -274,11 +269,9 @@ class BasicTransformerBlock(nn.Module):
             attention_mask=encoder_attention_mask if self.only_cross_attention else attention_mask,
             **cross_attention_kwargs,
         )
-        # residual connextion ################################
         if self.use_ada_layer_norm_zero:
-            # timestep dependant gate, at high noise we don't trust much the intention but at the low level we need to trust the intention bloc
             attn_output = gate_msa.unsqueeze(1) * attn_output
-        hidden_states = attn_output + hidden_states  # RESnet layer 
+        hidden_states = attn_output + hidden_states
 
         # 2. Cross-Attention
         if self.attn2 is not None:
@@ -321,16 +314,3 @@ class BasicTransformerBlock(nn.Module):
         hidden_states = ff_output + hidden_states
 
         return hidden_states
-    
-    
-    
-        """
-        
-        the head number represent what size must the head looks into the input data
-        for example head_num = 8, if the spectrogram has (1,512) features, each head looks into 512/8 = 64, make it expert only at this region !
-        
-        
-        
-        
-        
-        """
