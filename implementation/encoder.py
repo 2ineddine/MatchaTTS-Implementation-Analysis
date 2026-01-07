@@ -6,8 +6,8 @@ import torch
 import torch.nn as nn  
 from einops import rearrange
 
-import matcha.utils as utils  
-from matcha.utils.model import sequence_mask
+
+from utils import sequence_mask
 
 
 
