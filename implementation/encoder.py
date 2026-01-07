@@ -115,3 +115,38 @@ class LayerNorm(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x = (x - x.mean(1, keepdim=True)) / (x.std(1, keepdim=True) + self.eps)
         return x * self.gamma.view(1, -1, *[1]*(x.ndim-2)) + self.beta.view(1, -1, *[1]*(x.ndim-2))
+    
+
+
+class ConvReluNorm(nn.Module):
+    def __init__(self, in_channels, hidden_channels, out_channels, kernel_size, n_layers, p_dropout):
+        super().__init__()
+        self.in_channels = in_channels
+        self.hidden_channels = hidden_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size
+        self.n_layers = n_layers
+        self.p_dropout = p_dropout
+
+        self.conv_layers = torch.nn.ModuleList()
+        self.norm_layers = torch.nn.ModuleList()
+        self.conv_layers.append(torch.nn.Conv1d(in_channels, hidden_channels, kernel_size, padding=kernel_size // 2))
+        self.norm_layers.append(LayerNorm(hidden_channels))
+        self.relu_drop = torch.nn.Sequential(torch.nn.ReLU(), torch.nn.Dropout(p_dropout))
+        for _ in range(n_layers - 1):
+            self.conv_layers.append(
+                torch.nn.Conv1d(hidden_channels, hidden_channels, kernel_size, padding=kernel_size // 2)
+            )
+            self.norm_layers.append(LayerNorm(hidden_channels))
+        self.proj = torch.nn.Conv1d(hidden_channels, out_channels, 1)
+        self.proj.weight.data.zero_()
+        self.proj.bias.data.zero_()
+
+    def forward(self, x, x_mask):
+        x_org = x
+        for i in range(self.n_layers):
+            x = self.conv_layers[i](x * x_mask)
+            x = self.norm_layers[i](x)
+            x = self.relu_drop(x)
+        x = x_org + self.proj(x)
+        return x * x_mask
