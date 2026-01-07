@@ -57,9 +57,8 @@ class DurationPredictorParams:
 
 @dataclass
 class DataStatistics:
-    mel_mean: -5.536622
-    mel_std: 2.116101
-
+    mel_mean: float = -5.536622
+    mel_std: float = 2.116101
 
 
 # Create instances

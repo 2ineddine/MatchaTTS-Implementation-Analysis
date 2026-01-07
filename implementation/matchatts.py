@@ -13,7 +13,7 @@ import monotonic_align as monotonic_align
 from encoder import TextEncoder # not coded yet
 from flow_matching import CFM
 from utils import (
-    denormalize, # not coded yet
+    denormalize,
     duration_loss,
     fix_len_compatibility,
     generate_path,
@@ -35,9 +35,9 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
             decoder_params,  #  Accepts config object
             cfm_params,  #Accepts config object
             out_size,
+            mel_mean,  #  Passed directly instead of via data_statistics list
+            mel_std,
             prior_loss=True,
-            mel_mean=0.0,  #  Passed directly instead of via data_statistics list
-            mel_std=1.0,
 
     ):
         super().__init__()

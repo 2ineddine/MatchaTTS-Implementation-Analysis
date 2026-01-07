@@ -168,8 +168,79 @@ def fix_len_compatibility(length, num_downsamplings_in_unet=2):
     return adjusted_length
 
 
+def denormalize(data, mu, std):
+    """
+    Reverses normalization: converts standardized data back to original scale.
 
+    Formula: original = (normalized * std) + mu
 
+    This is the inverse of: normalized = (original - mu) / std
+
+    Args:
+        data: Normalized tensor. Shape: [batch, features, time] or any shape
+        mu: Mean used during normalization. Can be:
+            - float: single value for all features
+            - list/array/tensor: per-feature means
+        std: Standard deviation used during normalization. Same types as mu.
+
+    Returns:
+        Denormalized data in original scale
+
+    Example:
+        >>> normalized_mel = torch.randn(1, 80, 100)  # Normalized mel-spec
+        >>> mu = [0.5] * 80  # Mean per feature
+        >>> std = [1.2] * 80  # Std per feature
+        >>> original_mel = denormalize(normalized_mel, mu, std)
+    """
+
+    # ════════════════════════════════════════════════════
+    # Handle mu (mean) - Convert to tensor if needed
+    # ════════════════════════════════════════════════════
+
+    if not isinstance(mu, float):
+        # mu is not a simple float, need to convert to tensor
+
+        if isinstance(mu, list):
+            # Convert list to tensor, matching data's dtype and device
+            mu = torch.tensor(mu, dtype=data.dtype, device=data.device)
+
+        elif isinstance(mu, torch.Tensor):
+            # Already a tensor, just move to correct device
+            mu = mu.to(data.device)
+
+        elif isinstance(mu, np.ndarray):
+            # Convert numpy array to tensor, then move to device
+            mu = torch.from_numpy(mu).to(data.device)
+
+        # Add trailing dimension for broadcasting
+        # Shape: [features] → [features, 1]
+        # This allows element-wise operations with data of shape [batch, features, time]
+        mu = mu.unsqueeze(-1)
+
+    # If mu is a float, use it as-is (will broadcast automatically)
+
+    if not isinstance(std, float):
+        # std is not a simple float, need to convert to tensor
+
+        if isinstance(std, list):
+            # Convert list to tensor
+            std = torch.tensor(std, dtype=data.dtype, device=data.device)
+
+        elif isinstance(std, torch.Tensor):
+            # Move to correct device
+            std = std.to(data.device)
+
+        elif isinstance(std, np.ndarray):
+            # Convert numpy to tensor
+            std = torch.from_numpy(std).to(data.device)
+
+        # Add trailing dimension for broadcasting
+        # Shape: [features] → [features, 1]
+        std = std.unsqueeze(-1)
+
+    # Formula: original = (normalized * std) + mu
+    # Broadcasting handles different shapes automatically
+    return data * std + mu
 
 
 
