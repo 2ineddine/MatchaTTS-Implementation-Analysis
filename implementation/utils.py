@@ -1,7 +1,8 @@
 # Helper functions (MAS alignment, common layers)
-
+__author="Mouad"
 import torch
-
+import torch.nn.functional as F
+import numpy as np
 
 
 
