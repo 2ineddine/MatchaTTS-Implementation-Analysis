@@ -6,3 +6,9 @@ vocoder/
 ckpt*
 synth_output/
 LJSpeech-1.1/
+.vscode
+inference/results
+datasets
+*.pyc
+models
+vocoders
