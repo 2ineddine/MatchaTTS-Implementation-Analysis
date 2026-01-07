@@ -55,8 +55,15 @@ class DurationPredictorParams:
     kernel_size: int = 3
     p_dropout: float = 0.1  # Same as EncoderParams
 
+@dataclass
+class DataStatistics:
+    mel_mean: -5.536622
+    mel_std: 2.116101
+
+
 
 # Create instances
 encoder_params = EncoderParams()
 duration_params = DurationPredictorParams()
 audio_config = AudioConfig()
+data_stats = DataStatistics()
