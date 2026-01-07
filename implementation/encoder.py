@@ -102,3 +102,16 @@ class RotaryPositionalEmbeddings(nn.Module):
         
         # Restore original shape
         return rearrange(output, 't b h d -> b h t d')
+
+
+
+class LayerNorm(nn.Module):
+    def __init__(self, channels: int, eps: float = 1e-4):
+        super().__init__()
+        self.eps = eps
+        self.gamma = nn.Parameter(torch.ones(channels))
+        self.beta = nn.Parameter(torch.zeros(channels))
+    
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x = (x - x.mean(1, keepdim=True)) / (x.std(1, keepdim=True) + self.eps)
+        return x * self.gamma.view(1, -1, *[1]*(x.ndim-2)) + self.beta.view(1, -1, *[1]*(x.ndim-2))
