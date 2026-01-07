@@ -1,17 +1,12 @@
 # Dataset loading and text processing
 
+
+
 import numpy as np
 import torch
 
-
-
-
-# Text to sequence
-def text_to_sequence() : 
-
-
-
-
+from matcha.text import text_to_sequence
+from matcha.utils.utils import intersperse
 
 
 
@@ -40,3 +35,22 @@ def process_text(text, device):
     }
     
     return output
+
+
+
+if __name__ == "__main__":
+
+    # device
+    # Test environment
+    import torch; print('PyTorch:', torch.__version__, 'CUDA:', torch.cuda.is_available())
+    if torch.cuda.is_available() :
+        print(torch.cuda.get_device_name(0))
+
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"device : {DEVICE}")
+
+    text = "Hello World."
+    output = process_text(text, DEVICE)
+    
+    print(f"Input text : {text}")
+    print(f"Output sequence : {output['x']}")
