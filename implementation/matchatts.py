@@ -31,7 +31,7 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
             spk_emb_dim,
             n_feats,
             encoder_params,  #  Accepts config object instead of dict/kwargs
-            duration_params,  # Needed for TextEncoder init
+            duration_predictor_params,  # Needed for TextEncoder init
             decoder_params,  #  Accepts config object
             cfm_params,  #Accepts config object
             out_size,
@@ -61,7 +61,7 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         self.encoder = TextEncoder(
             encoder_params.encoder_type,
             encoder_params,
-            duration_params,  # class duration_params in config
+            duration_predictor_params,  # class duration_predictor_params in config
             n_vocab,
             n_spks,
             spk_emb_dim,

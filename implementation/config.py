@@ -63,6 +63,6 @@ class DataStatistics:
 
 # Create instances
 encoder_params = EncoderParams()
-duration_params = DurationPredictorParams()
+duration_predictor_params = DurationPredictorParams()
 audio_config = AudioConfig()
 data_stats = DataStatistics()
