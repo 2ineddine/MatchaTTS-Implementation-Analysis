@@ -1,3 +1,5 @@
+
+from dataclasses import dataclass
 # Constants, Parameters and Hyperparameters
 
 
@@ -18,6 +20,7 @@ TEST_SPLIT_PATH = r"datasets/data_files/test_filelist.txt"
 
 
 # Audio config
+@dataclass
 class AudioConfig:
     sample_rate = 22050
     n_mels = 80
@@ -28,3 +31,32 @@ class AudioConfig:
     f_max = 8000.0
     power = 1.0
     
+
+#  Encoder Config
+@dataclass
+class EncoderParams:
+    encoder_type: str = "RoPE Encoder"
+    n_vocab: int = 178
+    n_feats: int = 80
+    n_channels: int = 192
+    filter_channels: int = 768
+    filter_channels_dp: int = 256
+    n_heads: int = 2
+    n_layers: int = 6
+    kernel_size: int = 3
+    p_dropout: float = 0.1
+    spk_emb_dim: int = 64
+    n_spks: int = 1
+    prenet: bool = True
+
+@dataclass
+class DurationPredictorParams:
+    filter_channels_dp: int = 256  # Same as EncoderParams
+    kernel_size: int = 3
+    p_dropout: float = 0.1  # Same as EncoderParams
+
+
+# Create instances
+encoder_params = EncoderParams()
+duration_params = DurationPredictorParams()
+audio_config = AudioConfig()
