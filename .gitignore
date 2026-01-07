@@ -1,0 +1,8 @@
+﻿models
+vocoders
+synth_output
+datasets
+audios
+inference/results
+.vscode
+*.pyc
