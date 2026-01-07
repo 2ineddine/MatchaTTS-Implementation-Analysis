@@ -10,7 +10,7 @@ from matcha.utils.utils import intersperse
 
 
 
-# Main Text processing
+# Text processing
 @torch.inference_mode()
 def process_text(text, device):
     
@@ -38,16 +38,23 @@ def process_text(text, device):
 
 
 
+# DataFeeder
+
+
+
+
+
 if __name__ == "__main__":
 
     # device
-    # Test environment
     import torch; print('PyTorch:', torch.__version__, 'CUDA:', torch.cuda.is_available())
     if torch.cuda.is_available() :
         print(torch.cuda.get_device_name(0))
 
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"device : {DEVICE}")
+
+    # Test text processing
 
     text = "Hello World."
     output = process_text(text, DEVICE)
