@@ -2,7 +2,7 @@ import random
 from pathlib import Path
 
 # Configuration
-from config import SEED, LJSPEECH_METADATA_PATH, SPLIT_PATH
+from implementation.config import SEED, LJSPEECH_METADATA_PATH, SPLIT_PATH
 VALID_COUNT = 100
 TEST_COUNT = 100
 
