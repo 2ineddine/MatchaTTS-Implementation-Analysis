@@ -1,5 +1,7 @@
 # Dataset loading and text processing
 
+__author__ = "Massyl A."
+
 
 
 import numpy as np
