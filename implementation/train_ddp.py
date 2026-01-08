@@ -66,10 +66,10 @@ def main():
         if is_main_process():
             print(f"\n MODE DEBUG ACTIVÉ : On ne garde que {NUM_DEBUG_SAMPLES} exemples !")
         indices_train = torch.arange(min(NUM_DEBUG_SAMPLES, len(train_dataset)))
-        train_dataset = torch.utils.data.Subset(train_dataset, indices_train)
+        train_dataset = torch.utils.data.Subset(train_dataset, indices_train) # type: ignore
 
         indices_valid = torch.arange(min(16, len(valid_dataset)))
-        valid_dataset = torch.utils.data.Subset(valid_dataset, indices_valid)
+        valid_dataset = torch.utils.data.Subset(valid_dataset, indices_valid)  # type: ignore
 
     # Distributed samplers
     train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
@@ -157,7 +157,7 @@ def main():
     # ====================
     # 3. OPTIMIZER & MIXED PRECISION
     # ====================
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)  # type: ignore
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
     # Mixed Precision Training (FP16) - one scaler per process
@@ -229,7 +229,7 @@ def main():
             total_diff += diff_v
 
             if is_main_process() and batch_idx % LOG_INTERVAL == 0:
-                progress.set_postfix({
+                progress.set_postfix({   # type: ignore
                     "Loss": f"{loss_v:.3f}",
                     "Dur": f"{dur_v:.3f}",
                     "Prior": f"{prior_v:.3f}",
