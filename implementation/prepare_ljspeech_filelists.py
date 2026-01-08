@@ -1,3 +1,9 @@
+# Create and save the train Test Split for LJSpeech Dataset
+
+__author__ = "Massyl A."
+
+
+
 import random
 from pathlib import Path
 
@@ -5,6 +11,7 @@ from pathlib import Path
 from implementation.config import SEED, LJSPEECH_METADATA_PATH, SPLIT_PATH
 VALID_COUNT = 100
 TEST_COUNT = 100
+
 
 
 def main():
