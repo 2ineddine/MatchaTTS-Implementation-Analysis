@@ -7,3 +7,6 @@ inference/results
 .vscode
 *.pyc
 .ipynb_checkpoints/
+build/
+core.c
+core.cp*
