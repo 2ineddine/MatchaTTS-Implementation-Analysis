@@ -1,11 +1,12 @@
-# Training loop
-
+import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1,3,6,7"
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
 from pathlib import Path
-import os
-
+import time
+import datetime
+from tqdm import tqdm
 #  modules
 from .config import (
     #paths
@@ -15,7 +16,6 @@ from .config import (
     #model params
     encoder_params, duration_predictor_params, decoder_params, cfm_params, data_stats, audio_config
     )
-
 
 from .data import LJSpeechDataset, matcha_collate_fn
 from .matchatts import MatchaTTS
@@ -30,8 +30,6 @@ if torch.cuda.is_available():
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f"Using device: {device}")
 
-
-
 os.makedirs(SAVE_DIR, exist_ok=True)
 
 # ====================
@@ -40,7 +38,19 @@ os.makedirs(SAVE_DIR, exist_ok=True)
 print("Loading datasets...")
 train_dataset = LJSpeechDataset(TRAIN_SPLIT_PATH, LJSPEECH_WAV_PATH)
 valid_dataset = LJSpeechDataset(VALID_SPLIT_PATH, LJSPEECH_WAV_PATH)
+USE_DEBUG_DATASET = True  # Mets False pour tout entrainer
+NUM_DEBUG_SAMPLES = 1024   # Juste 2 batchs de 32 pour tester
 
+if USE_DEBUG_DATASET:
+    print(f"\n⚠️  MODE DEBUG ACTIVÉ : On ne garde que {NUM_DEBUG_SAMPLES} exemples !")
+    
+    # On coupe le dataset train
+    indices_train = torch.arange(min(NUM_DEBUG_SAMPLES, len(train_dataset)))
+    train_dataset = torch.utils.data.Subset(train_dataset, indices_train)
+    
+    # On coupe le dataset valid (on en garde moins, genre 16)
+    indices_valid = torch.arange(min(16, len(valid_dataset)))
+    valid_dataset = torch.utils.data.Subset(valid_dataset, indices_valid)
 train_loader = DataLoader(
     train_dataset,
     batch_size=BATCH_SIZE,
@@ -77,7 +87,16 @@ model = MatchaTTS(
     prior_loss=True
 ).to(device)
 
+# --- MULTI-GPU SETUP (OPTION 1) ---
+if torch.cuda.device_count() > 1:
+    print(f"🚀 MULTI-GPU ACTIVATED: Using {torch.cuda.device_count()} GPUs!")
+    model = nn.DataParallel(model)
+else:
+    print("⚠️ Single GPU or CPU mode.")
+# ----------------------------------
+
 # Count parameters
+# Note: Si DataParallel est actif, on accède aux params via model.parameters() normalement
 total_params = sum(p.numel() for p in model.parameters())
 trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 print(f"Total parameters: {total_params:,}")
@@ -101,7 +120,15 @@ def train_epoch(epoch):
     total_prior_loss = 0
     total_diff_loss = 0
     
-    for batch_idx, batch in enumerate(train_loader):
+    # --- TQDM SETUP ---
+    # On crée la barre de progression
+    # desc: Le texte à gauche de la barre
+    # leave=False: La barre disparaît à la fin de l'epoch (ou True pour la garder)
+    progress_bar = tqdm(train_loader, desc=f"Epoch {epoch}/{NUM_EPOCHS}", unit="batch")
+    # ------------------
+
+    # On itère sur la progress_bar au lieu du loader directement
+    for batch_idx, batch in enumerate(progress_bar):
         # Move to device
         x = batch["x"].to(device)
         x_lengths = batch["x_lengths"].to(device)
@@ -110,14 +137,15 @@ def train_epoch(epoch):
         
         # Forward pass
         dur_loss, prior_loss, diff_loss, attn = model(
-            x=x,
-            x_lengths=x_lengths,
-            y=y,
-            y_lengths=y_lengths,
-
-            cond=None
+            x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
         )
         
+        # Moyenne multi-GPU
+        if torch.cuda.device_count() > 1:
+            dur_loss = dur_loss.mean()
+            prior_loss = prior_loss.mean()
+            diff_loss = diff_loss.mean()
+
         # Total loss
         loss = dur_loss + prior_loss + diff_loss
         
@@ -133,17 +161,23 @@ def train_epoch(epoch):
         # Accumulate losses
         total_loss += loss.item()
         total_dur_loss += dur_loss.item()
-        total_prior_loss += prior_loss.item() if isinstance(prior_loss, torch.Tensor) else prior_loss
+        total_prior_loss += prior_loss.item()
         total_diff_loss += diff_loss.item()
         
-        # Log
+        # --- MISE À JOUR TQDM ---
+        # Au lieu de print, on met à jour les infos à droite de la barre
         if batch_idx % LOG_INTERVAL == 0:
-            print(f"Epoch {epoch} [{batch_idx}/{len(train_loader)}] "
-                  f"Loss: {loss.item():.4f} | "
-                  f"Dur: {dur_loss.item():.4f} | "
-                  f"Prior: {prior_loss.item() if isinstance(prior_loss, torch.Tensor) else prior_loss:.4f} | "
-                  f"Diff: {diff_loss.item():.4f}")
+            progress_bar.set_postfix({
+                "Loss": f"{loss.item():.3f}",
+                "Dur": f"{dur_loss.item():.3f}",
+                "Prior": f"{prior_loss.item():.3f}",
+                "Diff": f"{diff_loss.item():.3f}"
+            })
+        # ------------------------
     
+    # On ferme proprement la barre (optionnel avec le for, mais bonne pratique)
+    progress_bar.close()
+
     avg_loss = total_loss / len(train_loader)
     avg_dur = total_dur_loss / len(train_loader)
     avg_prior = total_prior_loss / len(train_loader)
@@ -161,7 +195,7 @@ def validate():
             x_lengths = batch["x_lengths"].to(device)
             y = batch["y"].to(device)
             y_lengths = batch["y_lengths"].to(device)
-            
+
             dur_loss, prior_loss, diff_loss, _ = model(
                 x=x,
                 x_lengths=x_lengths,
@@ -170,6 +204,12 @@ def validate():
                 cond=None
             )
             
+            # Moyenne multi-GPU si nécessaire
+            if torch.cuda.device_count() > 1:
+                dur_loss = dur_loss.mean()
+                prior_loss = prior_loss.mean()
+                diff_loss = diff_loss.mean()
+
             loss = dur_loss + prior_loss + diff_loss
             total_loss += loss.item()
     
@@ -201,10 +241,17 @@ for epoch in range(1, NUM_EPOCHS + 1):
     print(f"  Val Loss: {val_loss:.4f}")
     print(f"  LR: {scheduler.get_last_lr()[0]:.6f}")
     
-    # Save checkpoint
+    # --- SAUVEGARDE INTELLIGENTE (Fix pour DataParallel) ---
+    # Si le modèle est enveloppé dans DataParallel, on veut sauvegarder 'model.module'
+    # pour éviter d'avoir des clés 'module.encoder...' impossibles à charger plus tard.
+    if isinstance(model, nn.DataParallel):
+        state_dict = model.module.state_dict()
+    else:
+        state_dict = model.state_dict()
+
     checkpoint = {
         'epoch': epoch,
-        'model_state_dict': model.state_dict(),
+        'model_state_dict': state_dict, # On utilise le dictionnaire nettoyé
         'optimizer_state_dict': optimizer.state_dict(),
         'scheduler_state_dict': scheduler.state_dict(),
         'train_loss': train_loss,
