@@ -1,5 +1,7 @@
 # Training loop
 
+__author__ = "Yasser"
+
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -72,7 +74,6 @@ model = MatchaTTS(
     duration_predictor_params=duration_predictor_params,
     decoder_params=decoder_params,
     cfm_params=cfm_params,
-    out_size=None,  # Use full sequences
     mel_mean=data_stats.mel_mean,
     mel_std=data_stats.mel_std,
     prior_loss=True

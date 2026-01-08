@@ -1,5 +1,7 @@
 # Text Encoder & Duration Predictor
 
+__author__ = "Yasser"
+
 import math
 
 import torch
