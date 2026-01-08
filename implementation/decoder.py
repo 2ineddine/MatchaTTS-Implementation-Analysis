@@ -159,18 +159,18 @@ class Decoder(nn.Module):
     def __init__(self, 
                  in_channels,
                  out_channels,
-                 channels=(256, 256),
-                 dropout=0.05,
-                 attention_head_dim=64,
-                 n_blocks=1,           # Number of Transformers per level
-                 num_mid_blocks=2,     # Number of blocks in the bottleneck
-                 num_heads=4
+                 downsampling_upsampling_channels=(256, 256),   # The channel dimention for each downsampling/upsampling block
+                 num_mid_blocks=2,                              # Number of blocks in the middle part of the Unet (the bottleneck)
+                 dropout=0.05,                                  # dropout value of the Unet blocks (for resnet and transformer)
+                 n_transformer_per_block=1,                     # number of transformers in a Unet's block
+                 attention_head_dim=64,                         # Size of the key/query/value vectors inside the Transformer's attention
+                 num_attention_heads=4                          # Number of attention heads in the multi-head attention transformers
                  ):
         super().__init__()
         
         # 0. Time Embedding and Input Projection
         # --------------------------------------
-        time_dim = channels[0] 
+        time_dim = downsampling_upsampling_channels[0] 
         self.time_mlp = nn.Sequential(
             SinusoidalPosEmb(time_dim),
             nn.Linear(time_dim, time_dim),
@@ -179,24 +179,24 @@ class Decoder(nn.Module):
         )
 
         # In: Noisy(80) + Condition(80) -> First Hidden Channel
-        self.input_proj = nn.Conv1d(in_channels * 2, channels[0], 1)
+        self.input_proj = nn.Conv1d(in_channels * 2, downsampling_upsampling_channels[0], 1)
 
         # 1. Downsampling Path
         # --------------------
         self.down_blocks = nn.ModuleList()
         self.downsamples = nn.ModuleList()
         
-        current_ch = channels[0] 
-        prev_ch = channels[0] 
+        current_ch = downsampling_upsampling_channels[0] 
+        prev_ch = downsampling_upsampling_channels[0] 
         
-        for i, ch in enumerate(channels):
+        for i, ch in enumerate(downsampling_upsampling_channels):
             # Block
             block = UnetBlock(
                 in_ch=prev_ch, 
                 out_ch=ch, 
                 time_dim=time_dim,
-                n_transformer_blocks=n_blocks,
-                num_heads=num_heads,
+                n_transformer_blocks=n_transformer_per_block,
+                num_heads=num_attention_heads,
                 head_dim=attention_head_dim,
                 dropout=dropout
             )
@@ -212,15 +212,15 @@ class Decoder(nn.Module):
         # 2. Middle Path (Bottleneck)
         # ---------------------------
         self.mid_blocks = nn.ModuleList()
-        mid_ch = channels[-1] 
+        mid_ch = downsampling_upsampling_channels[-1] 
         
         for _ in range(num_mid_blocks):
             block = UnetBlock(
                 in_ch=mid_ch,
                 out_ch=mid_ch,
                 time_dim=time_dim,
-                n_transformer_blocks=n_blocks,
-                num_heads=num_heads,
+                n_transformer_blocks=n_transformer_per_block,
+                num_heads=num_attention_heads,
                 head_dim=attention_head_dim,
                 dropout=dropout
             )
@@ -231,7 +231,7 @@ class Decoder(nn.Module):
         self.up_blocks = nn.ModuleList()
         self.upsamples = nn.ModuleList()
         
-        reversed_channels = list(reversed(channels))
+        reversed_channels = list(reversed(downsampling_upsampling_channels))
         current_ch = reversed_channels[0]
         
         for i in range(len(reversed_channels)):
@@ -246,8 +246,8 @@ class Decoder(nn.Module):
                 in_ch=current_ch + target_ch, 
                 out_ch=target_ch, 
                 time_dim=time_dim,
-                n_transformer_blocks=n_blocks,
-                num_heads=num_heads,
+                n_transformer_blocks=n_transformer_per_block,
+                num_heads=num_attention_heads,
                 head_dim=attention_head_dim,
                 dropout=dropout
             )
@@ -257,9 +257,9 @@ class Decoder(nn.Module):
 
         # 4. Final Output
         # ---------------
-        self.final_norm = nn.GroupNorm(8, channels[0])
-        self.final_act = SnakeBeta(channels[0])
-        self.final_proj = nn.Conv1d(channels[0], out_channels, 1)
+        self.final_norm = nn.GroupNorm(8, downsampling_upsampling_channels[0])
+        self.final_act = SnakeBeta(downsampling_upsampling_channels[0])
+        self.final_proj = nn.Conv1d(downsampling_upsampling_channels[0], out_channels, 1)
 
     def forward(self, x, mask, mu, t):
         """

@@ -72,12 +72,12 @@ class DataStatistics:
 
 @dataclass
 class DecoderParams:
-    channels: tuple = (256, 256)  # U-Net channels
-    dropout: float = 0.05
-    attention_head_dim: int = 64
-    n_blocks: int = 1
-    num_mid_blocks: int = 2
-    num_heads: int = 2
+    downsampling_upsampling_channels: tuple = (256, 256)    # The channel dimention for each downsampling/upsampling block 
+    num_mid_blocks: int = 2                                 # Number of blocks in the middle part of the Unet (the bottleneck)
+    dropout: float = 0.05                                   # dropout value of the Unet blocks (for resnet and transformer)
+    n_transformer_per_block: int = 1                        # number of transformers in a Unet's block
+    attention_head_dim: int = 64                            # Size of the key/query/value vectors inside the Transformer's attention
+    num_attention_heads: int = 4                            # Number of attention heads in the multi-head attention transformers
 
 @dataclass
 class CFMParams:
