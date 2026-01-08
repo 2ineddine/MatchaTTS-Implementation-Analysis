@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Audio Rating</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+            background: #f5f5f5;
+            padding: 20px;
+            color: #333;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        .progress {
+            margin: 20px 0;
+            padding: 15px;
+            background: #e8f4f8;
+            border-radius: 6px;
+            font-size: 16px;
+            color: #2c3e50;
+        }
+
+        .audio-group {
+            margin: 30px 0;
+            padding: 25px;
+            background: #fafafa;
+            border-radius: 6px;
+            border: 1px solid #e0e0e0;
+        }
+
+        .audio-group h2 {
+            margin-bottom: 20px;
+            color: #34495e;
+            font-size: 20px;
+        }
+
+        .audio-item {
+            margin: 20px 0;
+            padding: 20px;
+            background: white;
+            border-radius: 6px;
+            border: 2px solid #e0e0e0;
+        }
+
+        .audio-item.rated {
+            border-color: #4CAF50;
+            background: #f9fdf9;
+        }
+
+        .audio-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .version-label {
+            font-weight: 600;
+            color: #555;
+            min-width: 80px;
+        }
+
+        audio {
+            flex: 1;
+            height: 40px;
+        }
+
+        .rating {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-top: 10px;
+        }
+
+        .rating button {
+            width: 50px;
+            height: 50px;
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .rating button:hover {
+            background: #e3f2fd;
+            border-color: #2196F3;
+            transform: scale(1.05);
+        }
+
+        .rating button.selected {
+            background: #2196F3;
+            color: white;
+            border-color: #2196F3;
+        }
+
+        .next-btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin-top: 30px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .next-btn:hover {
+            background: #45a049;
+        }
+
+        .next-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .complete {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .complete h2 {
+            color: #4CAF50;
+            margin-bottom: 20px;
+            font-size: 28px;
+        }
+
+        .results {
+            text-align: left;
+            margin: 20px 0;
+            padding: 20px;
+            background: #f5f5f5;
+            border-radius: 6px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .results h3 {
+            margin: 15px 0 10px 0;
+            color: #34495e;
+        }
+
+        .results p {
+            margin: 5px 0;
+            padding: 8px;
+            background: white;
+            border-radius: 4px;
+        }
+
+        .name-form {
+            margin: 30px 0;
+            padding: 30px;
+            background: #fafafa;
+            border-radius: 6px;
+        }
+
+        .name-form h2 {
+            margin-bottom: 20px;
+            color: #34495e;
+        }
+
+        .form-group {
+            margin: 15px 0;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            font-family: inherit;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #2196F3;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Audio Naturalness Rating</h1>
+        <p>Please listen to each version and rate how human it sounds: 1 (Robotic) to 5 (Human)</p>
+
+        <div class="progress" id="progress">
+            Audio Set 1 of 3
+        </div>
+
+        <div id="content"></div>
+    </div>
+
+    <script>
+        // GOOGLE APPS SCRIPT WEB APP URL
+        // Instructions to set this up in setup_instructions.txt
+        const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTA8dlNAuU5NvF2hLITkWgjC6ww5UG5FovP55rPMSS8k176X_5yyEXtzOnDL-euY1C/exec';
+
+        // CONFIGURATION - Edit these to customize
+        const CONFIG = {
+            numAudioSets: 3,        // Number of different audio sets
+            versionsPerSet: 5,      // Number of versions per audio set
+            audioFiles: [
+                // Audio Set 1
+                [
+                    'audio1_version1.mp3',
+                    'audio1_version2.mp3',
+                    'audio1_version3.mp3',
+                    'audio1_version4.mp3',
+                    'audio1_version5.mp3'
+                ],
+                // Audio Set 2
+                [
+                    'audio2_version1.mp3',
+                    'audio2_version2.mp3',
+                    'audio2_version3.mp3',
+                    'audio2_version4.mp3',
+                    'audio2_version5.mp3'
+                ],
+                // Audio Set 3
+                [
+                    'audio3_version1.mp3',
+                    'audio3_version2.mp3',
+                    'audio3_version3.mp3',
+                    'audio3_version4.mp3',
+                    'audio3_version5.mp3'
+                ]
+            ]
+        };
+
+        let currentSet = 0;
+        let currentVersion = 0;
+        let ratings = [];
+        let userName = '';
+        let userLastName = '';
+        let isSubmitting = false;
+
+        function renderAudioVersion() {
+            const content = document.getElementById('content');
+            const audioSet = CONFIG.audioFiles[currentSet];
+
+            if (!ratings[currentSet]) {
+                ratings[currentSet] = new Array(audioSet.length).fill(null);
+            }
+
+            const file = audioSet[currentVersion];
+            const totalVersions = audioSet.length;
+
+            content.innerHTML = `
+                <div class="audio-group">
+                    <h2>Audio Set ${currentSet + 1} - Version ${currentVersion + 1} of ${totalVersions}</h2>
+                    <div class="audio-item" id="current-item">
+                        <div class="audio-header">
+                            <span class="version-label">Version ${currentVersion + 1}</span>
+                            <audio controls src="${file}">
+                                Your browser does not support audio playback.
+                            </audio>
+                        </div>
+                        <div class="rating">
+                            ${[1, 2, 3, 4, 5].map(rating => `
+                                <button
+                                    class="${ratings[currentSet][currentVersion] === rating ? 'selected' : ''}"
+                                    onclick="rate(${rating})"
+                                >${rating}</button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                <button class="next-btn" onclick="nextVersion()" ${ratings[currentSet][currentVersion] === null ? 'disabled' : ''}>
+                    ${getNextButtonText()}
+                </button>
+            `;
+
+            document.getElementById('progress').textContent =
+                `Audio Set ${currentSet + 1} of ${CONFIG.numAudioSets}`;
+        }
+
+        function getNextButtonText() {
+            const audioSet = CONFIG.audioFiles[currentSet];
+            const isLastVersion = currentVersion === audioSet.length - 1;
+            const isLastSet = currentSet === CONFIG.numAudioSets - 1;
+
+            if (isLastVersion && isLastSet) {
+                return 'Complete & View Results';
+            } else if (isLastVersion) {
+                return 'Move to Next Audio';
+            } else {
+                return 'Next Version';
+            }
+        }
+
+        function rate(rating) {
+            ratings[currentSet][currentVersion] = rating;
+
+            const buttons = document.querySelectorAll('.rating button');
+            buttons.forEach((btn, idx) => {
+                if (idx + 1 === rating) {
+                    btn.classList.add('selected');
+                } else {
+                    btn.classList.remove('selected');
+                }
+            });
+
+            const nextBtn = document.querySelector('.next-btn');
+            if (nextBtn && !isSubmitting) {
+                nextBtn.disabled = false;
+                // Reset button text if it was changed to "Submitting..."
+                const audioSet = CONFIG.audioFiles[currentSet];
+                const isLastVersion = currentVersion === audioSet.length - 1;
+                const isLastSet = currentSet === CONFIG.numAudioSets - 1;
+
+                if (isLastVersion && isLastSet) {
+                    nextBtn.textContent = 'Complete & View Results';
+                } else if (isLastVersion) {
+                    nextBtn.textContent = 'Move to Next Audio';
+                } else {
+                    nextBtn.textContent = 'Next Version';
+                }
+            }
+        }
+
+        function nextVersion() {
+            const audioSet = CONFIG.audioFiles[currentSet];
+
+            if (currentVersion < audioSet.length - 1) {
+                currentVersion++;
+                renderAudioVersion();
+            } else if (currentSet < CONFIG.numAudioSets - 1) {
+                currentSet++;
+                currentVersion = 0;
+                renderAudioVersion();
+            } else {
+                // Mark as submitting to prevent re-enabling
+                isSubmitting = true;
+
+                // Disable the button before showing results
+                const nextBtn = document.querySelector('.next-btn');
+                nextBtn.disabled = true;
+                nextBtn.textContent = 'Submitting...';
+                showResults();
+            }
+        }
+
+        async function showResults() {
+            const content = document.getElementById('content');
+            document.getElementById('progress').style.display = 'none';
+
+            // Show submitting message
+            content.innerHTML = `
+                <div class="complete">
+                    <h2>Submitting your ratings...</h2>
+                    <p>Please wait...</p>
+                </div>
+            `;
+
+            const saved = await saveToGoogleSheets();
+
+            const saveMessage = saved
+                ? '<p style="color: #4CAF50; font-weight: 600; font-size: 18px;">Your ratings have been submitted successfully!</p>'
+                : '<p style="color: #f44336; font-weight: 600; font-size: 18px;">There was an error submitting your ratings. Please contact the administrator.</p>';
+
+            content.innerHTML = `
+                <div class="complete">
+                    <h2>Thank you for participating!</h2>
+                    ${saveMessage}
+                    <p style="margin-top: 20px;">You can now close this page.</p>
+                </div>
+            `;
+        }
+
+        let hasSubmitted = false;
+
+        async function saveToGoogleSheets() {
+            // Prevent multiple submissions
+            if (hasSubmitted) {
+                console.log('Already submitted');
+                return true;
+            }
+
+            if (!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL === 'YOUR_GOOGLE_SCRIPT_URL_HERE') {
+                console.log('Google Script URL not configured');
+                return false;
+            }
+
+            const results = {
+                timestamp: new Date().toISOString(),
+                firstName: userName,
+                lastName: userLastName,
+                ratings: ratings
+            };
+
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(results)
+                });
+
+                hasSubmitted = true; // Mark as submitted
+                console.log('Results sent to Google Sheets');
+                return true;
+            } catch (error) {
+                console.error('Error saving to Google Sheets:', error);
+                return false;
+            }
+        }
+
+        function showNameForm() {
+            const content = document.getElementById('content');
+            content.innerHTML = `
+                <div class="name-form">
+                    <h2>Please enter your information</h2>
+                    <div class="form-group">
+                        <label for="firstName">First Name:</label>
+                        <input type="text" id="firstName" placeholder="Enter your first name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="lastName">Last Name:</label>
+                        <input type="text" id="lastName" placeholder="Enter your last name" required>
+                    </div>
+                    <button class="next-btn" onclick="submitName()" id="startBtn" disabled>Start Rating</button>
+                </div>
+            `;
+
+            const firstNameInput = document.getElementById('firstName');
+            const lastNameInput = document.getElementById('lastName');
+            const startBtn = document.getElementById('startBtn');
+
+            function checkInputs() {
+                if (firstNameInput.value.trim() && lastNameInput.value.trim()) {
+                    startBtn.disabled = false;
+                } else {
+                    startBtn.disabled = true;
+                }
+            }
+
+            firstNameInput.addEventListener('input', checkInputs);
+            lastNameInput.addEventListener('input', checkInputs);
+        }
+
+        function submitName() {
+            userName = document.getElementById('firstName').value.trim();
+            userLastName = document.getElementById('lastName').value.trim();
+
+            if (userName && userLastName) {
+                renderAudioVersion();
+            }
+        }
+
+        showNameForm();
+    </script>
+</body>
+</html>
