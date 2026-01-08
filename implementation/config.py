@@ -18,6 +18,18 @@ VALID_SPLIT_PATH = r"datasets/data_files/valid_filelist.txt"
 TEST_SPLIT_PATH = r"datasets/data_files/test_filelist.txt"
 
 
+#Model_training parameters
+
+# Hyperparameters
+BATCH_SIZE = 16
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 100
+GRAD_CLIP = 1.0
+SAVE_DIR = "checkpoints"
+LOG_INTERVAL = 100
+
+
+
 
 # Audio config
 @dataclass
@@ -45,8 +57,6 @@ class EncoderParams:
     n_layers: int = 6
     kernel_size: int = 3
     p_dropout: float = 0.1
-    spk_emb_dim: int = 64
-    n_spks: int = 1
     prenet: bool = True
 
 @dataclass

@@ -193,11 +193,6 @@ def denormalize(data, mu, std):
         >>> std = [1.2] * 80  # Std per feature
         >>> original_mel = denormalize(normalized_mel, mu, std)
     """
-
-    # ════════════════════════════════════════════════════
-    # Handle mu (mean) - Convert to tensor if needed
-    # ════════════════════════════════════════════════════
-
     if not isinstance(mu, float):
         # mu is not a simple float, need to convert to tensor
 
@@ -246,3 +241,17 @@ def denormalize(data, mu, std):
 
 
 
+"""
+Defines the set of symbols used in text input to the model.
+"""
+_pad = "_"
+_punctuation = ';:,.!?¡¿—…"«»“” '
+_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+_letters_ipa = (
+    "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
+)
+# Export all symbols:
+symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa)
+
+# Special symbol ids
+SPACE_ID = symbols.index(" ")
