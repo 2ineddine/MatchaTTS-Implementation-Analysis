@@ -57,8 +57,6 @@ class EncoderParams:
     n_layers: int = 6
     kernel_size: int = 3
     p_dropout: float = 0.1
-    spk_emb_dim: int = 64
-    n_spks: int = 1
     prenet: bool = True
 
 @dataclass
