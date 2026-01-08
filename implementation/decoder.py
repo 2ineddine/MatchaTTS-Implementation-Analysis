@@ -34,9 +34,14 @@ class SinusoidalPosEmb(torch.nn.Module):
         return emb
 
 class SnakeBeta(nn.Module):
-    def __init__(self, channels):
+    def __init__(self, channels, is_seq=False):
         super().__init__()
-        self.alpha = nn.Parameter(torch.zeros(1, channels, 1))
+        # is_seq=True: for transformer (B, T, C) - shape (1, 1, C)
+        # is_seq=False: for conv (B, C, T) - shape (1, C, 1)
+        if is_seq:
+            self.alpha = nn.Parameter(torch.zeros(1, 1, channels))
+        else:
+            self.alpha = nn.Parameter(torch.zeros(1, channels, 1))
 
     def forward(self, x):
         alpha = self.alpha.exp()
@@ -98,7 +103,7 @@ class TransformerBasic(nn.Module):
         
         self.ff = nn.Sequential(
             nn.Linear(channels, channels * 4),
-            SnakeBeta(channels * 4), # Snake here
+            SnakeBeta(channels * 4, is_seq=True), # Snake here - for sequence data (B, T, C)
             nn.Linear(channels * 4, channels),
             nn.Dropout(dropout)
         )
