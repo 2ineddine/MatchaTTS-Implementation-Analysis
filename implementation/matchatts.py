@@ -9,10 +9,10 @@ import torch
 import torch.nn as nn
 
 # Assure-toi que ces imports pointent vers tes fichiers
-import monotonic_align as monotonic_align
-from encoder import TextEncoder # not coded yet
-from flow_matching import CFM
-from utils import (
+from . import monotonic_align
+from .encoder import TextEncoder # not coded yet
+from .flow_matching import CFM
+from .utils import (
     denormalize,
     duration_loss,
     fix_len_compatibility,

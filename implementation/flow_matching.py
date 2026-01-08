@@ -4,7 +4,7 @@
 
 import torch
 import torch.nn as nn
-from decoder import Decoder
+from .decoder import Decoder
 
 
 class CFM(nn.Module):
