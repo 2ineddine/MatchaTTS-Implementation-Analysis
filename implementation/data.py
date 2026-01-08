@@ -11,9 +11,8 @@ from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 
 from config import AudioConfig, LJSPEECH_WAV_PATH, TRAIN_SPLIT_PATH
-
-from matcha.text import text_to_sequence
-from matcha.utils.utils import intersperse
+from utils import intersperse
+from text import text_to_sequence
 
 
 
@@ -187,10 +186,19 @@ def matcha_collate_fn(batch):
 
 if __name__ == "__main__":
 
-    # 2. Initialize Dataset
+    # A. Text to sequence test
+    text = "If you want, I can give you a ready-to-use VS Code settings.json tuned for PyTorch + dynamic ML projects, so Pylance or Pyright is almost noise-free."
+    sequence = text_to_sequence(text, ['english_cleaners2'])
+    print(f"Text_to_sequence test : {sequence}")
+
+
+
+    # B. Data loader Test
+
+    # Initialize Dataset
     train_dataset = LJSpeechDataset(TRAIN_SPLIT_PATH, LJSPEECH_WAV_PATH)
 
-    # 3. Initialize Loader
+    # Initialize Loader
     train_loader = DataLoader(
         train_dataset,
         batch_size=4,           # How many files to process at once
@@ -200,7 +208,7 @@ if __name__ == "__main__":
         pin_memory=True          # Faster transfer to GPU
     )
 
-    # 4. Loop
+    # Loop
     for batch in train_loader:
         print(batch['x'].shape) # Should be [32, Max_Text_Len]
         print(batch['y'].shape) # Should be [32, 80, Max_Audio_Len]

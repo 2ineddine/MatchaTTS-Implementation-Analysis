@@ -1,5 +1,9 @@
 # Helper functions (MAS alignment, common layers)
-__author="Mouad"
+
+__author__ = "Mouad"
+
+
+
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -42,6 +46,7 @@ def sequence_mask(length, max_length=None):
     return mask
 
 
+
 def duration_loss(logw, logw_, lengths):
     """
     Computes MSE loss for duration, normalized by the total number of valid frames.
@@ -57,6 +62,7 @@ def duration_loss(logw, logw_, lengths):
     #because we compute n losses, n valid pos ,and sum(lengths)=n
     loss = torch.sum((logw - logw_) ** 2) / torch.sum(lengths)
     return loss
+
 
 
 def convert_pad_shape(pad_shape):
@@ -88,6 +94,7 @@ def convert_pad_shape(pad_shape):
     pad_shape = [item for sublist in inverted_shape for item in sublist]
 
     return pad_shape
+
 
 
 def generate_path(duration, mask):
@@ -153,6 +160,7 @@ def generate_path(duration, mask):
     return path
 
 
+
 def fix_len_compatibility(length, num_downsamplings_in_unet=2):
     """
     Adjusts length to be compatible with U-Net downsampling.
@@ -167,6 +175,7 @@ def fix_len_compatibility(length, num_downsamplings_in_unet=2):
     factor = 2 ** num_downsamplings_in_unet
     adjusted_length = int(torch.ceil(torch.tensor(length) / factor) * factor)
     return adjusted_length
+
 
 
 def denormalize(data, mu, std):
@@ -240,18 +249,9 @@ def denormalize(data, mu, std):
 
 
 
-
-"""
-Defines the set of symbols used in text input to the model.
-"""
-_pad = "_"
-_punctuation = ';:,.!?¡¿—…"«»“” '
-_letters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-_letters_ipa = (
-    "ɑɐɒæɓʙβɔɕçɗɖðʤəɘɚɛɜɝɞɟʄɡɠɢʛɦɧħɥʜɨɪʝɭɬɫɮʟɱɯɰŋɳɲɴøɵɸθœɶʘɹɺɾɻʀʁɽʂʃʈʧʉʊʋⱱʌɣɤʍχʎʏʑʐʒʔʡʕʢǀǁǂǃˈˌːˑʼʴʰʱʲʷˠˤ˞↓↑→↗↘'̩'ᵻ"
-)
-# Export all symbols:
-symbols = [_pad] + list(_punctuation) + list(_letters) + list(_letters_ipa)
-
-# Special symbol ids
-SPACE_ID = symbols.index(" ")
+# add a blank symbol between each token
+def intersperse(lst, item):
+    # Adds blank symbol
+    result = [item] * (len(lst) * 2 + 1)
+    result[1::2] = lst
+    return result
