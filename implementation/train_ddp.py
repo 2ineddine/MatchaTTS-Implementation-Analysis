@@ -6,6 +6,7 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 from torch.utils.data import DataLoader, DistributedSampler
+from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
 import wandb  
@@ -154,10 +155,17 @@ def main():
         wandb.watch(model.module, log="gradients", log_freq=LOG_INTERVAL)
 
     # ====================
-    # 3. OPTIMIZER
+    # 3. OPTIMIZER & MIXED PRECISION
     # ====================
     optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
+
+    # Mixed Precision Training (FP16) - one scaler per process
+    scaler = GradScaler()
+    use_amp = True
+
+    if is_main_process():
+        print(f"Mixed Precision (FP16): Enabled")
 
     # ====================
     # Helpers: reduce losses across ranks
@@ -193,16 +201,21 @@ def main():
             y = batch["y"].to(device, non_blocking=True)
             y_lengths = batch["y_lengths"].to(device, non_blocking=True)
 
-            dur_loss, prior_loss, diff_loss, _ = model(
-                x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
-            )
-
-            loss = dur_loss + prior_loss + diff_loss
-
             optimizer.zero_grad(set_to_none=True)
-            loss.backward()
+
+            # Forward pass with mixed precision
+            with autocast(enabled=use_amp):
+                dur_loss, prior_loss, diff_loss, _ = model(
+                    x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
+                )
+                loss = dur_loss + prior_loss + diff_loss
+
+            # Backward pass with gradient scaling
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
-            optimizer.step()
+            scaler.step(optimizer)
+            scaler.update()
 
             # average metrics across ranks for logging
             loss_v = ddp_mean(loss)
@@ -249,10 +262,13 @@ def main():
             y = batch["y"].to(device, non_blocking=True)
             y_lengths = batch["y_lengths"].to(device, non_blocking=True)
 
-            dur_loss, prior_loss, diff_loss, _ = model(
-                x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
-            )
-            loss = dur_loss + prior_loss + diff_loss
+            # Use mixed precision for validation too
+            with autocast(enabled=use_amp):
+                dur_loss, prior_loss, diff_loss, _ = model(
+                    x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
+                )
+                loss = dur_loss + prior_loss + diff_loss
+
             total += ddp_mean(loss)
 
         return total / len(valid_loader)

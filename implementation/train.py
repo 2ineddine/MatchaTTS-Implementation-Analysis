@@ -5,6 +5,7 @@ __author__ = "Yasser"
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from torch.cuda.amp import GradScaler, autocast
 from pathlib import Path
 import os
 
@@ -95,6 +96,11 @@ if __name__ == '__main__':
     # Learning rate scheduler (optional)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
+    # Mixed Precision Training (FP16)
+    scaler = GradScaler() if device.type == 'cuda' else None  # type: ignore
+    use_amp = device.type == 'cuda'
+    print(f"Mixed Precision (FP16): {'Enabled' if use_amp else 'Disabled'}")
+
     # ====================
     # 4. TRAINING LOOP
     # ====================
@@ -112,26 +118,31 @@ if __name__ == '__main__':
             y = batch["y"].to(device)
             y_lengths = batch["y_lengths"].to(device)
 
-            # Forward pass
-            dur_loss, prior_loss, diff_loss, attn = model(
-                x=x,
-                x_lengths=x_lengths,
-                y=y,
-                y_lengths=y_lengths,
-                cond=None
-            )
-
-            # Total loss
-            loss = dur_loss + prior_loss + diff_loss
-
-            # Backward
             optimizer.zero_grad()
-            loss.backward()
 
-            # Gradient clipping
-            torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+            # Forward pass with mixed precision
+            with autocast(enabled=use_amp):
+                dur_loss, prior_loss, diff_loss, attn = model(
+                    x=x,
+                    x_lengths=x_lengths,
+                    y=y,
+                    y_lengths=y_lengths,
+                    cond=None
+                )
+                # Total loss
+                loss = dur_loss + prior_loss + diff_loss
 
-            optimizer.step()
+            # Backward pass with gradient scaling
+            if use_amp and scaler is not None:
+                scaler.scale(loss).backward()
+                scaler.unscale_(optimizer)
+                torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+                scaler.step(optimizer)
+                scaler.update()
+            else:
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
+                optimizer.step()
 
             # Accumulate losses
             total_loss += loss.item()
@@ -165,15 +176,17 @@ if __name__ == '__main__':
                 y = batch["y"].to(device)
                 y_lengths = batch["y_lengths"].to(device)
 
-                dur_loss, prior_loss, diff_loss, _ = model(
-                    x=x,
-                    x_lengths=x_lengths,
-                    y=y,
-                    y_lengths=y_lengths,
-                    cond=None
-                )
+                # Use mixed precision for validation too
+                with autocast(enabled=use_amp):
+                    dur_loss, prior_loss, diff_loss, _ = model(
+                        x=x,
+                        x_lengths=x_lengths,
+                        y=y,
+                        y_lengths=y_lengths,
+                        cond=None
+                    )
+                    loss = dur_loss + prior_loss + diff_loss
 
-                loss = dur_loss + prior_loss + diff_loss
                 total_loss += loss.item()
 
         return total_loss / len(valid_loader)
