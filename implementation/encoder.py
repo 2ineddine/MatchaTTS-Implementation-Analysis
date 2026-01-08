@@ -97,7 +97,7 @@ class RotaryPositionalEmbeddings(nn.Module):
         
         # Apply 2D rotation formula
         rotated_half = self._rotate_half(x_rope) # First d dimensions : apply rotation
-        x_rope = (x_rope * self.cos_cached[:x.shape[0]]) + (rotated_half * self.sin_cached[:x.shape[0]])
+        x_rope = (x_rope * self.cos_cached[:x.shape[0]]) + (rotated_half * self.sin_cached[:x.shape[0]])  # type: ignore
         
         # Concatenate rotated and pass-through parts
         output = torch.cat([x_rope, x_pass], dim=-1)
@@ -142,7 +142,7 @@ class ConvReluNorm(nn.Module):
             self.norm_layers.append(LayerNorm(hidden_channels))
         self.proj = torch.nn.Conv1d(hidden_channels, out_channels, 1)
         self.proj.weight.data.zero_()
-        self.proj.bias.data.zero_()
+        self.proj.bias.data.zero_()  # type: ignore
 
     def forward(self, x, x_mask):
         x_org = x
@@ -221,7 +221,7 @@ class MultiHeadAttention(nn.Module):
         torch.nn.init.xavier_uniform_(self.conv_k.weight)
         if proximal_init:
             self.conv_k.weight.data.copy_(self.conv_q.weight.data)
-            self.conv_k.bias.data.copy_(self.conv_q.bias.data)
+            self.conv_k.bias.data.copy_(self.conv_q.bias.data) # type: ignore
         torch.nn.init.xavier_uniform_(self.conv_v.weight)
 
     def forward(self, x, c, attn_mask=None):

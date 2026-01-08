@@ -89,7 +89,8 @@ if __name__ == '__main__':
     # ====================
     # 3. OPTIMIZER
     # ====================
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)
+    optimizer = torch.optim.AdamW(# type: ignore
+        model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)
 
     # Learning rate scheduler (optional)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)

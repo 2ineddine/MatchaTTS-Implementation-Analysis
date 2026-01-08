@@ -13,7 +13,7 @@ from unidecode import unidecode
 # Intializing the phonemizer globally significantly reduces the speed
 # now the phonemizer is not initialising at every call
 # Might be less flexible, but it is much-much faster
-global_phonemizer = phonemizer.backend.EspeakBackend(
+global_phonemizer = phonemizer.backend.EspeakBackend(  # type: ignore
     language="en-us",
     preserve_punctuation=True,
     with_stress=True,
