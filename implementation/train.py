@@ -19,7 +19,7 @@ from config import (
 
 from data import LJSpeechDataset, matcha_collate_fn
 from matchatts import MatchaTTS
-from matcha.text.symbols import symbols
+from utils import symbols
 
 # Set seed for reproducibility
 torch.manual_seed(SEED)
