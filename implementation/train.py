@@ -2,9 +2,6 @@
 
 __author__ = "Yasser"
 
-
-
-
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
@@ -20,11 +17,11 @@ from config import (
     #model params
     encoder_params, duration_predictor_params, decoder_params, cfm_params, data_stats, audio_config
     )
+
+
 from data import LJSpeechDataset, matcha_collate_fn
 from matchatts import MatchaTTS
 from text import symbols
-
-
 
 if __name__ == '__main__':
     # Set seed for reproducibility
