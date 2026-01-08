@@ -10,3 +10,5 @@ inference/results
 build/
 core.c
 core.cp*
+checkpoints
+output
