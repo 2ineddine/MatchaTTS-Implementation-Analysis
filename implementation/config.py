@@ -81,7 +81,6 @@ class DecoderParams:
 
 @dataclass
 class CFMParams:
-    solver: str = "euler"
     sigma_min: float = 1e-4
 
 

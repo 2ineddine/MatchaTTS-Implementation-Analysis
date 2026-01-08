@@ -1,16 +1,20 @@
 # Conditional Flow Matching (CFM)
 
+__author__ = "Massyl A."
+
 
 
 import torch
 import torch.nn as nn
 from decoder import Decoder
+from config import decoder_params
 
 
 class CFM(nn.Module):
+
     """
     Conditional Flow Matching for mel-spectrogram generation.
-    Wraps the U-Net decoder and implements ODE-based sampling.
+    Wraps the U-Net decoder and implements : CFM for training and ODE-based sampling for Inference.
     """
 
     def __init__(self, in_channels, out_channel, cfm_params, decoder_params):
@@ -19,21 +23,23 @@ class CFM(nn.Module):
         self.out_channel = out_channel
 
         # Store CFM parameters
-        self.solver = cfm_params.solver
         self.sigma_min = cfm_params.sigma_min
 
         # Initialize decoder (U-Net)
         self.decoder = Decoder(
             in_channels=in_channels,
             out_channels=out_channel,
-            channels=decoder_params.channels,
+            downsampling_upsampling_channels=decoder_params.downsampling_upsampling_channels,
             dropout=decoder_params.dropout,
             attention_head_dim=decoder_params.attention_head_dim,
-            n_blocks=decoder_params.n_blocks,
+            n_transformer_per_block=decoder_params.n_transformer_per_block,
             num_mid_blocks=decoder_params.num_mid_blocks,
-            num_heads=decoder_params.num_heads
+            num_attention_heads=decoder_params.num_attention_heads
         )
 
+
+    # 1. Inference mode : Infere X1 using Euler's ODE solver
+    @torch.inference_mode()
     def forward(self, mu, mask, n_timesteps, temperature=1.0):
         """
         Generate mel-spectrogram using ODE solver (Euler method).
@@ -59,6 +65,7 @@ class CFM(nn.Module):
         dt = 1.0 / n_timesteps
 
         for step in range(n_timesteps):
+            # create tensor t (1d vector)
             t = torch.full((batch,), step / n_timesteps, device=device, dtype=dtype)
 
             # Predict velocity field
@@ -70,43 +77,29 @@ class CFM(nn.Module):
 
         return x
 
+
+    # 2. Training mode : compute flow matching loss at a random time step
     def compute_loss(self, x1, mask, mu, cond=None):
-        """
-        Compute flow matching loss.
-
-        Args:
-            x1: Target mel-spectrogram (batch, n_feats, time)
-            mask: Binary mask (batch, 1, time)
-            mu: Encoder output (batch, n_feats, time)
-            cond: Optional additional conditioning
-
-        Returns:
-            loss: Scalar loss value
-            stats: Dictionary with loss statistics (empty for now)
-        """
-        batch = x1.shape[0]
-        device = x1.device
-        dtype = x1.dtype
-
-        # Sample random timestep t ~ U(0, 1)
-        t = torch.rand(batch, device=device, dtype=dtype)
-
-        # Sample noise (x0) - standard Gaussian noise
+        batch, _, _ = mu.shape
+        
+        # 1. Sample t and x0
+        t = torch.rand(batch, device=x1.device, dtype=x1.dtype)
         x0 = torch.randn_like(x1)
-        x0 = x0 * mask
-
-        # Interpolate between x0 and x1: x_t = t * x1 + (1 - t) * x0
-        t_expanded = t.view(batch, 1, 1)  # Shape: (batch, 1, 1)
-        x_t = t_expanded * x1 + (1 - t_expanded) * x0
-
-        # True velocity: dx/dt = x1 - x0
-        true_velocity = x1 - x0
-
-        # Predict velocity using decoder
+        
+        # 2. Add correct broadcasting for math
+        t_expanded = t.view(batch, 1, 1)
+        
+        # 3. Interpolate between x0 and x1: x_t = t * x1 + (1 - t) * x0     (Apply sigma_min for stability)
+        x_t = (1 - (1 - self.sigma_min) * t_expanded) * x0 + t_expanded * x1
+        
+        # 4. Calculate True Velocity (Target)
+        true_velocity = x1 - (1 - self.sigma_min) * x0
+        
+        # 5. Predict (Pass 1D 't' to decoder, not t_expanded)
         pred_velocity = self.decoder(x_t, mask, mu, t)
-
-        # MSE loss between predicted and true velocity
+        
+        # 6. Loss
         loss = torch.sum((pred_velocity - true_velocity) ** 2 * mask)
-        loss = loss / (torch.sum(mask) * x1.shape[1])  # Normalize by num valid elements
-
+        loss = loss / (torch.sum(mask) * x1.shape[1])
+        
         return loss, {}
