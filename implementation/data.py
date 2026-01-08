@@ -10,7 +10,7 @@ import torchaudio
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
 
-from implementation.config import AudioConfig, LJSPEECH_WAV_PATH, TRAIN_SPLIT_PATH
+from config import AudioConfig, LJSPEECH_WAV_PATH, TRAIN_SPLIT_PATH
 
 from matcha.text import text_to_sequence
 from matcha.utils.utils import intersperse
