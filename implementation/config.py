@@ -18,6 +18,18 @@ VALID_SPLIT_PATH = r"datasets/data_files/valid_filelist.txt"
 TEST_SPLIT_PATH = r"datasets/data_files/test_filelist.txt"
 
 
+#Model_training parameters
+
+# Hyperparameters
+BATCH_SIZE = 16
+LEARNING_RATE = 1e-4
+NUM_EPOCHS = 100
+GRAD_CLIP = 1.0
+SAVE_DIR = "checkpoints"
+LOG_INTERVAL = 100
+
+
+
 
 # Audio config
 @dataclass
