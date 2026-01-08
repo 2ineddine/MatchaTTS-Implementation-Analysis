@@ -60,9 +60,26 @@ class DataStatistics:
     mel_mean: float = -5.536622
     mel_std: float = 2.116101
 
+@dataclass
+class DecoderParams:
+    channels: tuple = (256, 256)  # U-Net channels
+    dropout: float = 0.05
+    attention_head_dim: int = 64
+    n_blocks: int = 1
+    num_mid_blocks: int = 2
+    num_heads: int = 2
+    act_fn: str = "snakebeta"
+
+@dataclass
+class CFMParams:
+    solver: str = "euler"
+    sigma_min: float = 1e-4
+
 
 # Create instances
 encoder_params = EncoderParams()
 duration_predictor_params = DurationPredictorParams()
 audio_config = AudioConfig()
 data_stats = DataStatistics()
+decoder_params = DecoderParams()
+cfm_params = CFMParams()
