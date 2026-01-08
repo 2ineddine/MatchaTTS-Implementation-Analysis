@@ -204,7 +204,7 @@ class Decoder(nn.Module):
             
             # Downsampler (Conv stride 2)
             down = nn.Conv1d(ch, ch, kernel_size=3, stride=2, padding=1)
-            self.down_blocks.append(down)
+            #self.down_blocks.append(down)
             self.downsamples.append(down)
             
             prev_ch = ch
@@ -282,28 +282,30 @@ class Decoder(nn.Module):
         mask_stack = [mask]
         
         # --- DOWN ---
+        # --- DOWN ---
         for block, downsample in zip(self.down_blocks, self.downsamples):
-            # 1. Process Block
+            # 1. Process Block (The UnetBlock)
             current_mask = mask_stack[-1]
-            x = block(x, t_emb, current_mask)
+            x = block(x, t_emb, current_mask) # Now 'block' is definitely a UnetBlock
             x = x * current_mask
             
-            # 2. Save Skip
+            # 2. Save Skip connection (Before downsampling)
             skips.append(x) 
             
-            # 3. Downsample Feature
+            # 3. Downsample Feature (The Conv1d)
+            # Conv1d only takes 'x', so we don't pass t_emb or mask here
             x = downsample(x)
             
             # 4. Downsample Mask
-            # Stride 2 logic: take every 2nd element
+            # Use slicing for stride 2 logic
             new_mask = current_mask[:, :, ::2]
             
-            # Safety: Ensure mask length matches x length (handle padding mismatch)
+            # Safety check for padding/shape alignment
             if new_mask.shape[2] != x.shape[2]:
                 new_mask = new_mask[:, :, :x.shape[2]]
             
             mask_stack.append(new_mask)
-            x = x * new_mask # Apply new mask
+            x = x * new_mask
             
         # --- MID ---
         mid_mask = mask_stack[-1]
