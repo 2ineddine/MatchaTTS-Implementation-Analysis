@@ -9,10 +9,10 @@ import torch
 import torch.nn as nn
 
 # Assure-toi que ces imports pointent vers tes fichiers
-import monotonic_align as monotonic_align
-from encoder import TextEncoder # not coded yet
-from flow_matching import CFM
-from utils import (
+import .monotonic_align as monotonic_align
+from .encoder import TextEncoder # not coded yet
+from .flow_matching import CFM
+from .utils import (
     denormalize,
     duration_loss,
     fix_len_compatibility,
@@ -27,13 +27,14 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
     def __init__(
             self,
             n_vocab,
-
+            n_spks,
+            spk_emb_dim,
             n_feats,
             encoder_params,  #  Accepts config object instead of dict/kwargs
             duration_predictor_params,  # Needed for TextEncoder init
             decoder_params,  #  Accepts config object
             cfm_params,  #Accepts config object
-
+            out_size,
             mel_mean,  #  Passed directly instead of via data_statistics list
             mel_std,
             prior_loss=True,
@@ -43,8 +44,10 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
 
 
         self.n_vocab = n_vocab
-
+        self.n_spks = n_spks
+        self.spk_emb_dim = spk_emb_dim
         self.n_feats = n_feats
+        self.out_size = out_size
         self.prior_loss = prior_loss
 
 
@@ -52,14 +55,16 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         self.register_buffer("mel_mean", torch.tensor(mel_mean).float())
         self.register_buffer("mel_std", torch.tensor(mel_std).float())
 
-
+        if n_spks > 1:
+            self.spk_emb = torch.nn.Embedding(n_spks, spk_emb_dim)
 
         self.encoder = TextEncoder(
             encoder_params.encoder_type,
             encoder_params,
             duration_predictor_params,  # class duration_predictor_params in config
             n_vocab,
-
+            n_spks,
+            spk_emb_dim,
         )
 
         self.decoder = CFM(
@@ -67,11 +72,12 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
             out_channel=encoder_params.n_feats,
             cfm_params=cfm_params,
             decoder_params=decoder_params,
-
+            n_spks=n_spks,
+            spk_emb_dim=spk_emb_dim,
         )
 
     @torch.inference_mode()
-    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0,length_scale=1.0):
+    def synthesise(self, x, x_lengths, n_timesteps, temperature=1.0, spks=None, length_scale=1.0):
         """
         Generates mel-spectrogram from text.
         (Logic remains mostly identical to original, just removed RTF logging for simplicity)
@@ -79,10 +85,12 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         # For RTF computation
         t = dt.datetime.now()
 
-
+        if self.n_spks > 1 and spks is not None:
+            # Get speaker embedding
+            spks = self.spk_emb(spks.long())
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask = self.encoder(x, x_lengths)
+        mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
 
         w = torch.exp(logw) * x_mask
         w_ceil = torch.ceil(w) * length_scale
@@ -101,7 +109,7 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         encoder_outputs = mu_y[:, :, :y_max_length]
 
         # Generate sample tracing the probability flow
-        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature)
+        decoder_outputs = self.decoder(mu_y, y_mask, n_timesteps, temperature, spks)
         decoder_outputs = decoder_outputs[:, :, :y_max_length]
 
         t = (dt.datetime.now() - t).total_seconds()
@@ -117,7 +125,7 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         }
 
 
-    def forward(self, x, x_lengths, y, y_lengths,cond=None):
+    def forward(self, x, x_lengths, y, y_lengths, spks=None, out_size=None, cond=None):
         """
         Computes 3 losses:
             1. duration loss: loss between predicted token durations and those extracted by Monotonic Alignment Search (MAS).
@@ -133,13 +141,17 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
                 shape: (batch_size, n_feats, max_mel_length)
             y_lengths (torch.Tensor): lengths of mel-spectrograms in batch.
                 shape: (batch_size,)
-
-
+            out_size (int, optional): length (in mel's sampling rate) of segment to cut, on which decoder will be trained.
+                Should be divisible by 2^{num of UNet downsamplings}. Needed to increase batch size.
+            spks (torch.Tensor, optional): speaker ids.
+                shape: (batch_size,)
         """
-
+        if self.n_spks > 1:
+            # Get speaker embedding
+            spks = self.spk_emb(spks)
 
         # Get encoder_outputs `mu_x` and log-scaled token durations `logw`
-        mu_x, logw, x_mask = self.encoder(x, x_lengths)
+        mu_x, logw, x_mask = self.encoder(x, x_lengths, spks)
         y_max_length = y.shape[-1]
 
         y_mask = sequence_mask(y_lengths, y_max_length).unsqueeze(1).to(x_mask)
@@ -167,7 +179,7 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
         mu_y = mu_y.transpose(1, 2)
 
         # Compute loss of the decoder
-        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y,cond=cond)
+        diff_loss, _ = self.decoder.compute_loss(x1=y, mask=y_mask, mu=mu_y, spks=spks, cond=cond)
 
         if self.prior_loss:
             prior_loss = torch.sum(0.5 * ((y - mu_y) ** 2 + math.log(2 * math.pi)) * y_mask)
