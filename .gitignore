@@ -6,3 +6,4 @@ audios
 inference/results
 .vscode
 *.pyc
+.ipynb_checkpoints/
