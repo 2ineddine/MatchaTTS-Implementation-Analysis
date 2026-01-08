@@ -9,7 +9,7 @@ import torch.nn as nn
 from einops import rearrange
 
 
-from .utils import sequence_mask
+from utils import sequence_mask
 
 
 
