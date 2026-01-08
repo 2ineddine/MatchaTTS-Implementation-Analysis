@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.transformer.AttentionBlock import Attention
-
+from src.transformer.activation_function import SnakeBeta
 
 class SinusoidalPosEmb(nn.Module):
     """Sinusoidal positional embeddings for timesteps"""
@@ -117,8 +117,7 @@ class Transformer(nn.Module):
         )
         self.norm2 = nn.LayerNorm(dim)
         self.mlp = nn.Sequential(
-            nn.Linear(dim, dim * 4),
-            nn.GELU(),
+            SnakeBeta(in_features=dim, out_features=dim*4),  # activation in expanded space
             nn.Dropout(dropout),
             nn.Linear(dim * 4, dim),
             nn.Dropout(dropout)
@@ -261,8 +260,8 @@ class UNet(nn.Module):
                 nn.init.kaiming_normal_(m.weight, nonlinearity="relu")
                 if m.bias is not None:
                     nn.init.constant_(m.bias, 0)
-    
-    def forward(self, x, mu, t):
+
+    def forward(self, x, mu, mask, t):
         """
         Forward pass
         
@@ -274,8 +273,8 @@ class UNet(nn.Module):
         Returns:
             output: (B, out_channels, T)
         """
-        # Create mask from input (assumes non-zero values are valid)
-        mask = (x.abs().sum(dim=1, keepdim=True) > 0).float()
+        # # Create mask from input (assumes non-zero values are valid)
+        # mask = (x.abs().sum(dim=1, keepdim=True) > 0).float()
         
         # Process timestep
         t_emb = self.time_embeddings(t)
@@ -378,5 +377,6 @@ model = UNet(
 x = torch.randn(4, 80, 160)  # Batch of 4, 80 channels, 160 timesteps
 mu = torch.randn(4, 80, 160)
 t = torch.randint(0, 1000, (4,))
-output = model(x, mu, t)
+mask = torch.ones(4, 1, 160)  # All valid frames
+output = model(x, mu, mask, t)
 print(output.shape)  # Should be (4, 80, 160)
