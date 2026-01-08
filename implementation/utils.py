@@ -193,11 +193,6 @@ def denormalize(data, mu, std):
         >>> std = [1.2] * 80  # Std per feature
         >>> original_mel = denormalize(normalized_mel, mu, std)
     """
-
-    # ════════════════════════════════════════════════════
-    # Handle mu (mean) - Convert to tensor if needed
-    # ════════════════════════════════════════════════════
-
     if not isinstance(mu, float):
         # mu is not a simple float, need to convert to tensor
 
