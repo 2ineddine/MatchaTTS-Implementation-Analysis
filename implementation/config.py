@@ -78,7 +78,6 @@ class DecoderParams:
     n_blocks: int = 1
     num_mid_blocks: int = 2
     num_heads: int = 2
-    act_fn: str = "snakebeta"
 
 @dataclass
 class CFMParams:
