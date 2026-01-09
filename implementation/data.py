@@ -127,13 +127,16 @@ def get_mel(wav_path, mel_transform=None):
 
 # Data Loader
 class LJSpeechDataset(Dataset):
-    def __init__(self, filelist_path, wavs_dir):
+    def __init__(self, filelist_path, wavs_dir, use_precomputed_mels=True):
         """
         Args:
             filelist_path: Path to '.../train_filelist.txt'
             wavs_dir: Path to 'wavs' folder
+            use_precomputed_mels: If True, load precomputed .npy mels (MUCH faster)
         """
         self.wavs_dir = Path(wavs_dir)
+        self.mels_dir = Path(wavs_dir).parent / "mels"  # datasets/LJSpeech-1.1/mels
+        self.use_precomputed_mels = use_precomputed_mels
         self.items = []
 
         # Parse the filelist
@@ -142,6 +145,16 @@ class LJSpeechDataset(Dataset):
             for line in f:
                 parts = line.strip().split('|')
                 self.items.append(parts)
+
+        # Check if precomputed mels exist
+        if self.use_precomputed_mels:
+            if self.mels_dir.exists():
+                print(f"✓ Using precomputed mels from {self.mels_dir}")
+            else:
+                print(f"⚠ WARNING: Precomputed mels not found at {self.mels_dir}")
+                print(f"   Run 'python prepare_files.py' first for faster training!")
+                print(f"   Falling back to extracting mels from .wav files...")
+                self.use_precomputed_mels = False
 
     def __len__(self):
         return len(self.items)
@@ -152,13 +165,17 @@ class LJSpeechDataset(Dataset):
         # A. Process Text
         text_tensor = process_text_single(text)
 
-        # B. Process Audio
-        wav_path = self.wavs_dir / f"{filename}.wav"
-        mel_tensor = get_mel(wav_path)
-
-        # C. Normalize mel using dataset statistics
-        # This ensures training mels have mean≈0, std≈1
-        mel_tensor = (mel_tensor - data_stats.mel_mean) / data_stats.mel_std
+        # B. Load Mel (precomputed or extract from wav)
+        if self.use_precomputed_mels:
+            # Load precomputed normalized mel from .npy (FAST!)
+            mel_path = self.mels_dir / f"{filename}.npy"
+            mel_tensor = torch.from_numpy(np.load(mel_path))
+        else:
+            # Extract mel from .wav file (SLOW)
+            wav_path = self.wavs_dir / f"{filename}.wav"
+            mel_tensor = get_mel(wav_path)
+            # Normalize
+            mel_tensor = (mel_tensor - data_stats.mel_mean) / data_stats.mel_std
 
         return {
             "x": text_tensor,      # [Text_Length]
