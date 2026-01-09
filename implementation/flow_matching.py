@@ -6,8 +6,7 @@ __author__ = "Massyl A."
 
 import torch
 import torch.nn as nn
-from decoder import Decoder
-from config import decoder_params
+from Unet import UNet
 
 
 class CFM(nn.Module):
@@ -26,7 +25,7 @@ class CFM(nn.Module):
         self.sigma_min = cfm_params.sigma_min
 
         # Initialize decoder (U-Net)
-        self.decoder = Decoder(
+        self.decoder = UNet(
             in_channels=in_channels,
             out_channels=out_channel,
             downsampling_upsampling_channels=decoder_params.downsampling_upsampling_channels,
