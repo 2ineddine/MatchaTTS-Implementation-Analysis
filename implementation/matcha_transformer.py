@@ -1,5 +1,7 @@
 # Implementation of the matchatts transformer block of the Unet (no positional embedding, snakebeta activation)
 
+__author__ = "Massyl A."
+
 
 
 from typing import Any, Dict, Optional
@@ -9,8 +11,6 @@ import torch.nn as nn
 
 from diffusers.models.lora import LoRACompatibleLinear
 from diffusers.models.attention_processor import Attention
-from diffusers.models.attention import AdaLayerNorm, AdaLayerNormZero
-from diffusers.utils.torch_utils import maybe_allow_in_graph
 
 
 
@@ -125,3 +125,79 @@ class FeedForward(nn.Module):
             hidden_states = module(hidden_states)
         return hidden_states
     
+
+
+class MatchaTransformer(nn.Module):
+    """
+    A Straight Forward Non-Modular implementation of the Transformer block used in Shivam's MatchaTTS Paper.
+    Structure: Pre-Norm -> Self-Attention -> Residual -> Pre-Norm -> FeedForward -> Residual
+    """
+
+    def __init__(
+        self,
+        dim: int,
+        num_attention_heads: int,
+        attention_head_dim: int,
+        dropout: float = 0.0,
+        ff_mult: int = 4  # Multiplier for the FeedForward inner dimension
+    ):
+        super().__init__()
+
+        # 1. Self-Attention Layer
+        # We use standard LayerNorm because time conditioning happens in the ResNet block
+        self.norm1 = nn.LayerNorm(dim)
+        
+        # If using the diffusers version, ensure 'cross_attention_dim' is None.
+        self.attn1 = Attention(
+            query_dim=dim,
+            heads=num_attention_heads,
+            dim_head=attention_head_dim,
+            dropout=dropout,
+            bias=False,             # Usually False for modern Transformers
+            cross_attention_dim=None # Pure Self-Attention
+        )
+
+        # 2. Feed-Forward Layer
+        # LayerNorm again
+        self.norm2 = nn.LayerNorm(dim)
+        
+        # This uses the custom FF (Linear + SnakeBeta + Linear) defined above
+        self.ff = FeedForward(
+            dim_in=dim,
+            dim_out=dim,
+            mult=ff_mult,
+            dropout=dropout,
+            final_dropout=False 
+        )
+
+    def forward(self, hidden_states, attention_mask=None):
+        """
+        Args:
+            hidden_states: Input tensor of shape (Batch, Time, Dim)
+            attention_mask: Optional mask for attention (Batch, Time)
+        """
+        
+        # --- Block 1: Self-Attention ---
+        # 1. Pre-Normalization
+        norm_hidden_states = self.norm1(hidden_states)
+        
+        # 2. Attention
+        attn_output = self.attn1(
+            norm_hidden_states,
+            attention_mask=attention_mask
+        )
+        
+        # 3. Residual Connection
+        hidden_states = hidden_states + attn_output
+
+        # --- Block 2: Feed-Forward ---
+        # 1. Pre-Normalization
+        norm_hidden_states = self.norm2(hidden_states)
+        
+        # 2. Feed-Forward (with SnakeBeta)
+        ff_output = self.ff(norm_hidden_states)
+        
+        # 3. Residual Connection
+        hidden_states = hidden_states + ff_output
+
+        return hidden_states
