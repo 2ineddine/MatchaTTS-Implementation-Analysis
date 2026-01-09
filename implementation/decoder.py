@@ -1,14 +1,13 @@
 # The 1D U-Net & Flow Prediction
 
 __author__ = "Massyl A."
+__author__ = "Zinnedine"
 
 
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 import math
-from einops import pack, rearrange, repeat
 
 from matcha_transformer import MatchaTransformer
 
