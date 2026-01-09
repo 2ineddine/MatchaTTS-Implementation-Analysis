@@ -23,7 +23,7 @@ TEST_SPLIT_PATH = r"datasets/data_files/test_filelist.txt"
 # Hyperparameters
 BATCH_SIZE = 32
 LEARNING_RATE = 1e-4
-NUM_EPOCHS = 100
+NUM_EPOCHS = 150
 GRAD_CLIP = 5.0
 SAVE_DIR = "checkpoints"
 LOG_INTERVAL = 100
