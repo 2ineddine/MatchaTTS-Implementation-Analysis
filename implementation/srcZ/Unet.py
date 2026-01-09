@@ -339,6 +339,10 @@ class UNet(nn.Module):
         for resnet, transformers, upsample in self.up_blocks:
             current_mask = masks.pop()
             skip = skip_connections.pop()
+
+            # If the upsampled x is 1 pixel larger (due to odd/even mismatch), crop it.
+            if x.shape[-1] != skip.shape[-1]:
+                x = x[:, :, :skip.shape[-1]]
             
             # Concatenate skip connection
             x = torch.cat([x, skip], dim=1)
