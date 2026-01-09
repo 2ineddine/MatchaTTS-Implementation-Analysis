@@ -6,10 +6,9 @@ import torch
 import torch.nn as nn
 import torch.distributed as dist
 from torch.utils.data import DataLoader, DistributedSampler
-from torch.cuda.amp import GradScaler, autocast
 from tqdm import tqdm
 
-import wandb  
+import wandb
 
 # modules
 from config import (
@@ -43,9 +42,8 @@ def main():
     local_rank = setup_ddp()
     device = torch.device("cuda", local_rank)
 
-    seed_everything(SEED + dist.get_rank())  # small offset per rank helps determinism issues
+    seed_everything(SEED + dist.get_rank())
 
-    # Create save dir only on main process
     if is_main_process():
         print(f"DDP initialized. World size={dist.get_world_size()}")
         os.makedirs(SAVE_DIR, exist_ok=True)
@@ -71,11 +69,9 @@ def main():
         indices_valid = torch.arange(min(16, len(valid_dataset)))
         valid_dataset = torch.utils.data.Subset(valid_dataset, indices_valid)  # type: ignore
 
-    # Distributed samplers
     train_sampler = DistributedSampler(train_dataset, shuffle=True, drop_last=True)
     valid_sampler = DistributedSampler(valid_dataset, shuffle=False, drop_last=False)
 
-    # Per-process batch size (global batch = BATCH_SIZE * world_size)
     train_loader = DataLoader(
         train_dataset,
         batch_size=BATCH_SIZE,
@@ -117,12 +113,11 @@ def main():
         prior_loss=True
     ).to(device)
 
-    # Wrap with DDP
     model = nn.parallel.DistributedDataParallel(
         model,
         device_ids=[local_rank],
         output_device=local_rank,
-        find_unused_parameters=False,  # set True only if you get "unused params" errors
+        find_unused_parameters=False,
     )
 
     if is_main_process():
@@ -132,7 +127,7 @@ def main():
         print(f"Trainable parameters: {trainable_params:,}")
 
     # ====================
-    # 2.5 INIT W&B (rank 0 only)
+    # 2.5 INIT W&B (rank 0 only) — EPOCH ONLY
     # ====================
     run = None
     if is_main_process():
@@ -144,6 +139,7 @@ def main():
                 "seed": SEED,
                 "batch_size_per_gpu": BATCH_SIZE,
                 "lr": LEARNING_RATE,
+                "weight_decay": 0.0,  # Mis à jour dans la config W&B
                 "epochs": NUM_EPOCHS,
                 "grad_clip": GRAD_CLIP,
                 "world_size": dist.get_world_size(),
@@ -151,14 +147,14 @@ def main():
                 "num_debug_samples": NUM_DEBUG_SAMPLES if USE_DEBUG_DATASET else None,
             },
         )
-        # Optional (can be heavy): logs gradients/parameter histograms
-        wandb.watch(model.module, log="gradients", log_freq=LOG_INTERVAL)
+
+        # ✅ Make epoch the global x-axis (step metric)
+        wandb.define_metric("epoch")
+        wandb.define_metric("epoch/*", step_metric="epoch")
 
     # ====================
-    # 3. OPTIMIZER & MIXED PRECISION
+    # 3. OPTIMIZER (MODIFIÉ : Pas de WD, pas de Scheduler)
     # ====================
-    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.01)  # type: ignore
-    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=50, gamma=0.5)
 
     # Mixed Precision Training (FP16) - one scaler per process
     scaler = GradScaler()
@@ -166,19 +162,22 @@ def main():
 
     if is_main_process():
         print(f"Mixed Precision (FP16): Enabled")
+    # Suppression du weight decay (0.0) comme dans la config originale matcha/adam.yaml
+    optimizer = torch.optim.AdamW(model.parameters(), lr=LEARNING_RATE, betas=(0.9, 0.999), weight_decay=0.0)
+    
+
 
     # ====================
     # Helpers: reduce losses across ranks
     # ====================
     def ddp_mean(x: torch.Tensor) -> float:
-        """Average a scalar tensor across all ranks, return python float."""
         x = x.detach()
         dist.all_reduce(x, op=dist.ReduceOp.SUM)
         x = x / dist.get_world_size()
         return x.item()
 
     # ====================
-    # 4. TRAINING LOOP
+    # 4. TRAINING LOOP (NO wandb.log HERE)
     # ====================
     def train_epoch(epoch: int):
         model.train()
@@ -193,31 +192,24 @@ def main():
         if is_main_process():
             progress = tqdm(train_loader, desc=f"Epoch {epoch}/{NUM_EPOCHS}", unit="batch")
 
-        global_step_base = (epoch - 1) * len(train_loader)
-
         for batch_idx, batch in enumerate(progress):
             x = batch["x"].to(device, non_blocking=True)
             x_lengths = batch["x_lengths"].to(device, non_blocking=True)
             y = batch["y"].to(device, non_blocking=True)
             y_lengths = batch["y_lengths"].to(device, non_blocking=True)
 
+            dur_loss, prior_loss, diff_loss, _ = model(
+                x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
+            )
+            loss = dur_loss + prior_loss + diff_loss
+
             optimizer.zero_grad(set_to_none=True)
-
-            # Forward pass with mixed precision
-            with autocast(enabled=use_amp):
-                dur_loss, prior_loss, diff_loss, _ = model(
-                    x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
-                )
-                loss = dur_loss + prior_loss + diff_loss
-
-            # Backward pass with gradient scaling
-            scaler.scale(loss).backward()
-            scaler.unscale_(optimizer)
+            loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), GRAD_CLIP)
-            scaler.step(optimizer)
-            scaler.update()
+            optimizer.step()
 
-            # average metrics across ranks for logging
+            # Note: Pas de scheduler.step() ici
+
             loss_v = ddp_mean(loss)
             dur_v = ddp_mean(dur_loss)
             prior_v = ddp_mean(prior_loss)
@@ -236,18 +228,6 @@ def main():
                     "Diff": f"{diff_v:.3f}",
                 })
 
-                global_step = global_step_base + batch_idx
-                wandb.log(
-                    {
-                        "train/loss": loss_v,
-                        "train/dur_loss": dur_v,
-                        "train/prior_loss": prior_v,
-                        "train/diff_loss": diff_v,
-                        "train/lr": optimizer.param_groups[0]["lr"],
-                    },
-                    step=global_step,
-                )
-
         n = len(train_loader)
         return total / n, total_dur / n, total_prior / n, total_diff / n
 
@@ -262,19 +242,16 @@ def main():
             y = batch["y"].to(device, non_blocking=True)
             y_lengths = batch["y_lengths"].to(device, non_blocking=True)
 
-            # Use mixed precision for validation too
-            with autocast(enabled=use_amp):
-                dur_loss, prior_loss, diff_loss, _ = model(
-                    x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
-                )
-                loss = dur_loss + prior_loss + diff_loss
-
+            dur_loss, prior_loss, diff_loss, _ = model(
+                x=x, x_lengths=x_lengths, y=y, y_lengths=y_lengths, cond=None
+            )
+            loss = dur_loss + prior_loss + diff_loss
             total += ddp_mean(loss)
 
         return total / len(valid_loader)
 
     # ====================
-    # 5. MAIN TRAINING
+    # 5. MAIN TRAINING (wandb.log EPOCH ONLY)
     # ====================
     if is_main_process():
         print("\nStarting training...")
@@ -287,34 +264,38 @@ def main():
 
         train_loss, train_dur, train_prior, train_diff = train_epoch(epoch)
         val_loss = validate()
-        scheduler.step()
+        
+        # SUPPRESSION DU SCHEDULER STEP
+        # scheduler.step()
 
         if is_main_process():
+            # Récupération du LR depuis l'optimizer directement (pour vérifier qu'il est fixe)
+            current_lr = optimizer.param_groups[0]['lr']
+
             print(f"\nEpoch {epoch} Summary:")
             print(f"  Train Loss: {train_loss:.4f} (Dur: {train_dur:.4f}, Prior: {train_prior:.4f}, Diff: {train_diff:.4f})")
             print(f"  Val Loss: {val_loss:.4f}")
-            print(f"  LR: {scheduler.get_last_lr()[0]:.6f}")
+            print(f"  LR: {current_lr:.6f}")
 
-            #  epoch-level wandb logging
+            # ✅ EPOCH-ONLY wandb logging (x-axis = epoch)
             wandb.log(
-                        {
-                            "epoch": epoch,
-                            "epoch/train_loss": train_loss,
-                            "epoch/train_dur_loss": train_dur,
-                            "epoch/train_prior_loss": train_prior,
-                            "epoch/train_diff_loss": train_diff,
-                            "epoch/val_loss": val_loss,
-                            "epoch/lr": scheduler.get_last_lr()[0],
-                        }
-                    )
+                {
+                    "epoch": epoch,
+                    "epoch/train_loss": train_loss,
+                    "epoch/train_dur_loss": train_dur,
+                    "epoch/train_prior_loss": train_prior,
+                    "epoch/train_diff_loss": train_diff,
+                    "epoch/val_loss": val_loss,
+                    "epoch/lr": current_lr,
+                }
+            )
 
-            # Save checkpoints (IMPORTANT: model.module is the real model under DDP)
             state_dict = model.module.state_dict()
             checkpoint = {
                 "epoch": epoch,
                 "model_state_dict": state_dict,
                 "optimizer_state_dict": optimizer.state_dict(),
-                "scheduler_state_dict": scheduler.state_dict(),
+                # "scheduler_state_dict": ... (supprimé)
                 "train_loss": train_loss,
                 "val_loss": val_loss,
             }
@@ -322,7 +303,6 @@ def main():
             latest_path = Path(SAVE_DIR) / "latest.pt"
             torch.save(checkpoint, latest_path)
 
-            # (Optional) log latest checkpoint as artifact
             latest_art = wandb.Artifact("matcha-tts-latest", type="model")
             latest_art.add_file(str(latest_path))
             wandb.log_artifact(latest_art)
@@ -333,15 +313,13 @@ def main():
                 torch.save(checkpoint, best_path)
                 print(f"  ✓ New best model saved! (Val loss: {val_loss:.4f})")
 
-                # (Optional) log best checkpoint as artifact
                 best_art = wandb.Artifact("matcha-tts-best", type="model")
                 best_art.add_file(str(best_path))
                 wandb.log_artifact(best_art)
 
-            if epoch % 10 == 0:
+            if epoch % 50 == 0:
                 torch.save(checkpoint, Path(SAVE_DIR) / f"epoch_{epoch}.pt")
 
-        # Sync before next epoch (keeps ranks aligned)
         dist.barrier()
 
     if is_main_process():
