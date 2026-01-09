@@ -27,7 +27,7 @@ class CFM(nn.Module):
 
         # Initialize decoder (U-Net)
         self.decoder = Decoder(
-            in_channels=in_channels,
+            in_channels=in_channels*2,
             out_channels=out_channel,
             downsampling_upsampling_channels=decoder_params.downsampling_upsampling_channels,
             dropout=decoder_params.dropout,
