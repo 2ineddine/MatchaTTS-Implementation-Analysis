@@ -9,9 +9,10 @@ import torch
 import torch.nn as nn
 
 # Assure-toi que ces imports pointent vers tes fichiers
+from decoderZ import Decoder
 import monotonic_align as monotonic_align
 from encoder import TextEncoder # not coded yet
-from flow_matching import CFM
+#from flow_matching import CFM
 from utils import (
     denormalize,
     duration_loss,
@@ -54,10 +55,9 @@ class MatchaTTS(nn.Module):  # [MODIFIED] Inherits from nn.Module instead of Bas
             n_vocab,
         )
 
-        self.decoder = CFM(
+        self.decoder = Decoder(
             in_channels=encoder_params.n_feats,
             out_channel=encoder_params.n_feats,
-            cfm_params=cfm_params,
             decoder_params=decoder_params,
         )
 

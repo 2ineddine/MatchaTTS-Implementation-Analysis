@@ -75,7 +75,7 @@ if __name__ == '__main__':
         encoder_params=encoder_params,
         duration_predictor_params=duration_predictor_params,
         decoder_params=decoder_params,
-        cfm_params=cfm_params,
+        #cfm_params=cfm_params,
         mel_mean=data_stats.mel_mean,
         mel_std=data_stats.mel_std,
         prior_loss=True
