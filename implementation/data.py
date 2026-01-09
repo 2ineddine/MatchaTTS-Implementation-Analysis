@@ -143,19 +143,6 @@ class LJSpeechDataset(Dataset):
                 parts = line.strip().split('|')
                 self.items.append(parts)
 
-        # initialize mel
-        self.mel_transform = torchaudio.transforms.MelSpectrogram(
-                sample_rate=AudioConfig.sample_rate,
-                n_fft=AudioConfig.n_fft,
-                win_length=AudioConfig.win_length,
-                hop_length=AudioConfig.hop_length,
-                f_min=AudioConfig.f_min,
-                f_max=AudioConfig.f_max,
-                n_mels=AudioConfig.n_mels,
-                power=AudioConfig.power,
-                center=False
-            )
-
     def __len__(self):
         return len(self.items)
 
@@ -167,7 +154,7 @@ class LJSpeechDataset(Dataset):
 
         # B. Process Audio
         wav_path = self.wavs_dir / f"{filename}.wav"
-        mel_tensor = get_mel(wav_path, self.mel_transform)
+        mel_tensor = get_mel(wav_path)
 
         # C. Normalize mel using dataset statistics
         # This ensures training mels have mean≈0, std≈1
