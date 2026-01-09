@@ -42,9 +42,9 @@ function setupSheet() {
   // Create headers
   const headers = ['Timestamp', 'First Name', 'Last Name'];
 
-  // Assuming 3 audio sets with 5 versions each (adjust based on your CONFIG)
-  for (let set = 1; set <= 3; set++) {
-    for (let version = 1; version <= 5; version++) {
+  // 4 audio sets with 4 versions each (custom_steps10, original_steps10, custom_steps20, original_steps20)
+  for (let set = 1; set <= 4; set++) {
+    for (let version = 1; version <= 4; version++) {
       headers.push(`Audio${set}_V${version}`);
     }
   }

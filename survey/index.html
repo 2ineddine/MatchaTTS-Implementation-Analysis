@@ -229,34 +229,38 @@
         // Instructions to set this up in setup_instructions.txt
         const GOOGLE_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwTA8dlNAuU5NvF2hLITkWgjC6ww5UG5FovP55rPMSS8k176X_5yyEXtzOnDL-euY1C/exec';
 
-        // CONFIGURATION - Edit these to customize
+        // CONFIGURATION - 4 samples × 2 configs × 2 models
         const CONFIG = {
-            numAudioSets: 3,        // Number of different audio sets
-            versionsPerSet: 5,      // Number of versions per audio set
+            numAudioSets: 4,        // 4 samples
+            versionsPerSet: 4,      // 4 versions: custom_steps10, original_steps10, custom_steps20, original_steps20
             audioFiles: [
-                // Audio Set 1
+                // Sample 1
                 [
-                    'audio1_version1.mp3',
-                    'audio1_version2.mp3',
-                    'audio1_version3.mp3',
-                    'audio1_version4.mp3',
-                    'audio1_version5.mp3'
+                    'audio_samples/sample1_custom_steps10.wav',
+                    'audio_samples/sample1_original_steps10.wav',
+                    'audio_samples/sample1_custom_steps20.wav',
+                    'audio_samples/sample1_original_steps20.wav'
                 ],
-                // Audio Set 2
+                // Sample 2
                 [
-                    'audio2_version1.mp3',
-                    'audio2_version2.mp3',
-                    'audio2_version3.mp3',
-                    'audio2_version4.mp3',
-                    'audio2_version5.mp3'
+                    'audio_samples/sample2_custom_steps10.wav',
+                    'audio_samples/sample2_original_steps10.wav',
+                    'audio_samples/sample2_custom_steps20.wav',
+                    'audio_samples/sample2_original_steps20.wav'
                 ],
-                // Audio Set 3
+                // Sample 3
                 [
-                    'audio3_version1.mp3',
-                    'audio3_version2.mp3',
-                    'audio3_version3.mp3',
-                    'audio3_version4.mp3',
-                    'audio3_version5.mp3'
+                    'audio_samples/sample3_custom_steps10.wav',
+                    'audio_samples/sample3_original_steps10.wav',
+                    'audio_samples/sample3_custom_steps20.wav',
+                    'audio_samples/sample3_original_steps20.wav'
+                ],
+                // Sample 4
+                [
+                    'audio_samples/sample4_custom_steps10.wav',
+                    'audio_samples/sample4_original_steps10.wav',
+                    'audio_samples/sample4_custom_steps20.wav',
+                    'audio_samples/sample4_original_steps20.wav'
                 ]
             ]
         };

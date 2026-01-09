@@ -1,0 +1,86 @@
+[
+  {
+    "sample_id": 1,
+    "filename": "LJ036-0190",
+    "text": "If Oswald left his roominghouse shortly after one p.m. and walked at a brisk pace,",
+    "audios": [
+      {
+        "config": "steps10",
+        "temp": 0.667,
+        "steps": 10,
+        "custom_file": "sample1_custom_steps10.wav",
+        "original_file": "sample1_original_steps10.wav"
+      },
+      {
+        "config": "steps20",
+        "temp": 0.667,
+        "steps": 20,
+        "custom_file": "sample1_custom_steps20.wav",
+        "original_file": "sample1_original_steps20.wav"
+      }
+    ]
+  },
+  {
+    "sample_id": 2,
+    "filename": "LJ008-0265",
+    "text": "although in the long run mercy generally prevailed, and very few capitally convicted for crimes less than murder actually suffered.",
+    "audios": [
+      {
+        "config": "steps10",
+        "temp": 0.667,
+        "steps": 10,
+        "custom_file": "sample2_custom_steps10.wav",
+        "original_file": "sample2_original_steps10.wav"
+      },
+      {
+        "config": "steps20",
+        "temp": 0.667,
+        "steps": 20,
+        "custom_file": "sample2_custom_steps20.wav",
+        "original_file": "sample2_original_steps20.wav"
+      }
+    ]
+  },
+  {
+    "sample_id": 3,
+    "filename": "LJ024-0080",
+    "text": "Our difficulty with the Court today rises not from the Court as an institution but from human beings within it.",
+    "audios": [
+      {
+        "config": "steps10",
+        "temp": 0.667,
+        "steps": 10,
+        "custom_file": "sample3_custom_steps10.wav",
+        "original_file": "sample3_original_steps10.wav"
+      },
+      {
+        "config": "steps20",
+        "temp": 0.667,
+        "steps": 20,
+        "custom_file": "sample3_custom_steps20.wav",
+        "original_file": "sample3_original_steps20.wav"
+      }
+    ]
+  },
+  {
+    "sample_id": 4,
+    "filename": "LJ004-0179",
+    "text": "The allowance of food daily to felons was a fourpenny loaf,",
+    "audios": [
+      {
+        "config": "steps10",
+        "temp": 0.667,
+        "steps": 10,
+        "custom_file": "sample4_custom_steps10.wav",
+        "original_file": "sample4_original_steps10.wav"
+      },
+      {
+        "config": "steps20",
+        "temp": 0.667,
+        "steps": 20,
+        "custom_file": "sample4_custom_steps20.wav",
+        "original_file": "sample4_original_steps20.wav"
+      }
+    ]
+  }
+]
