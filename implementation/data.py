@@ -9,10 +9,15 @@ import torch
 import torchaudio
 from torch.utils.data import Dataset, DataLoader
 from pathlib import Path
+from librosa.filters import mel as librosa_mel_fn
 
-from config import AudioConfig, LJSPEECH_WAV_PATH, TRAIN_SPLIT_PATH
+from config import AudioConfig, LJSPEECH_WAV_PATH, TRAIN_SPLIT_PATH, data_stats
 from utils import intersperse
 from text import text_to_sequence
+
+# Global cache for mel basis and hann window (from original Matcha-TTS)
+mel_basis = {}
+hann_window = {}
 
 
 
@@ -61,30 +66,62 @@ def process_text_single(text):
 
 
 
-# Mel transform
-def get_mel(wav_path, mel_transform):
+# Mel extraction (using original Matcha-TTS method with librosa filterbank)
+def get_mel(wav_path, mel_transform=None):
     """
     Reads a wav file and converts it to a Log-Mel Spectrogram.
+    Uses the same method as original Matcha-TTS (librosa mel filterbank).
     """
+    global mel_basis, hann_window
+
     # 1. Load Audio
     audio, sr = torchaudio.load(wav_path)
 
-    # 2. Resample for ssafety (LJSpeech is usually 22050Hz)
+    # 2. Resample if needed
     if sr != AudioConfig.sample_rate:
         audio = torchaudio.transforms.Resample(sr, AudioConfig.sample_rate)(audio)
 
-    # 3. Clip audio (safety against outliers)
-    audio = torch.clamp(audio[0], -1.0, 1.0).unsqueeze(0)
+    # 3. Take first channel (mono)
+    audio = audio[0]  # Shape: [Time]
 
-    # 4. Convert to Mel Spectrogram
-    mel = mel_transform(audio)
+    # 4. Create mel filterbank if not cached (using librosa like original)
+    fmax_key = f"{AudioConfig.f_max}_{audio.device}"
+    if fmax_key not in mel_basis:
+        mel = librosa_mel_fn(
+            sr=AudioConfig.sample_rate,
+            n_fft=AudioConfig.n_fft,
+            n_mels=AudioConfig.n_mels,
+            fmin=AudioConfig.f_min,
+            fmax=AudioConfig.f_max
+        )
+        mel_basis[fmax_key] = torch.from_numpy(mel).float().to(audio.device)
+        hann_window[str(audio.device)] = torch.hann_window(AudioConfig.win_length).to(audio.device)
 
-    # 5. Log Compression (Dynamic Range Compression)
-    # We clamp min to 1e-5 to avoid log(0) = -infinity
-    mel = torch.log(torch.clamp(mel, min=1e-5))
-    
-    # Shape: [Channels(80), Time]
-    return mel.squeeze(0)
+    # 5. STFT (manual, like original)
+    spec = torch.stft(
+        audio,
+        n_fft=AudioConfig.n_fft,
+        hop_length=AudioConfig.hop_length,
+        win_length=AudioConfig.win_length,
+        window=hann_window[str(audio.device)],
+        center=False,
+        pad_mode="reflect",
+        normalized=False,
+        onesided=True,
+        return_complex=True,
+    )
+
+    # 6. Magnitude
+    spec = torch.sqrt(spec.real.pow(2) + spec.imag.pow(2) + 1e-9)
+
+    # 7. Apply mel filterbank
+    spec = torch.matmul(mel_basis[fmax_key], spec)
+
+    # 8. Log compression
+    spec = torch.log(torch.clamp(spec, min=1e-5))
+
+    # Shape: [80, Time]
+    return spec
 
 
 
@@ -132,9 +169,13 @@ class LJSpeechDataset(Dataset):
         wav_path = self.wavs_dir / f"{filename}.wav"
         mel_tensor = get_mel(wav_path, self.mel_transform)
 
+        # C. Normalize mel using dataset statistics
+        # This ensures training mels have mean≈0, std≈1
+        mel_tensor = (mel_tensor - data_stats.mel_mean) / data_stats.mel_std
+
         return {
             "x": text_tensor,      # [Text_Length]
-            "y": mel_tensor,       # [80, Audio_Length]
+            "y": mel_tensor,       # [80, Audio_Length] - NORMALIZED
             "name": filename,
             "text": text
         }
