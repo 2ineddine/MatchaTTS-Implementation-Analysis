@@ -1,34 +1,122 @@
-# Implementation and Analysis of the MatchaTTS Paper
+# MatchaTTS Implementation and Analysis
 
+**Authors:**
 
-## Project Description
+- Massyl Adjal (Project Lead & Coordinator)
 
-This repository contains our group's implementation and analysis of the Matcha-TTS model, as described in the paper "Matcha-TTS: A fast TTS architecture with conditional flow matching" by Shivam Mehta et al. Matcha-TTS is a non-autoregressive text-to-speech (TTS) system that leverages optimal-transport conditional flow matching (OT-CFM) for efficient, probabilistic generation of mel-spectrograms, enabling faster synthesis compared to traditional diffusion-based models like Grad-TTS.
+- Yasser Bouhai
 
-As a group project by four students, we focus on reproducing the model's architecture, training it from scratch, and evaluating it against the original paper's metrics and the official pre-trained models. Our goal is to gain a deep understanding of flow-matching techniques in TTS while providing a clear, reproducible implementation for educational purposes.
+- Zineddine Bouhadjira
 
-Key features of Matcha-TTS (as per the paper):
-- **Encoder-Decoder Architecture**: Text encoder with Rotary Positional Embeddings (RoPE) and a 1D U-Net decoder for flow prediction.
-- **Flow Matching**: Uses OT-CFM for straight-line paths in probabilistic space, reducing inference steps (NFE) to as few as 2-10.
-- **Vocoder Integration**: Paired with HiFi-GAN for waveform generation.
-- **Datasets**: Primarily trained on LJ Speech for single-speaker TTS.
+- Mohamed Mouad Boularas
 
-This project includes our re-implementation, scripts for training/evaluation, and comparative results.
+**Institution:** Sorbonne Université — Master Ingénierie des Systèmes Intelligents
 
+**Repository:** [https://github.com/2ineddine/MatchaTTS-Implementation-Analysis](https://www.google.com/search?q=https://github.com/2ineddine/MatchaTTS-Implementation-Analysis)
 
-## Objectives
+---
 
-- **Utilize Official Resources**: Leverage the official GitHub repository and pre-trained models to reproduce reported metrics.
-- **Re-implement the Paper**: Build the model from scratch in PyTorch, following the architecture and training procedures described in the paper.
+## Project Overview
 
+This project focuses on the reproducibility and analysis of **Matcha-TTS**, a state-of-the-art non-autoregressive text-to-speech architecture based on **Optimal-Transport Conditional Flow Matching (OT-CFM)**.
+
+Matcha-TTS is designed to synthesize high-quality mel-spectrograms efficiently. Unlike diffusion models that require many iterative steps, Matcha-TTS uses an ODE-based decoder to transform noise into speech representations along a straight trajectory.
+
+We present a complete re-implementation of the model, featuring a Transformer-based text encoder with Rotational Position Embeddings (RoPE) and a lightweight 1D U-Net decoder. We evaluated our implementation against the official pre-trained checkpoint using the LJ Speech dataset.
+
+---
+
+## Architecture
+
+The system functions sequentially through two main subsystems:
+
+### 1. The Encoder (Text Processing)
+
+- **Text Encoder:** Transforms raw text into contextualized embeddings using a stack of transformer blocks.
+  
+  - **Preprocessing:** Uses 1D convolutions (Prenet) for local feature extraction.
+  
+  - **Positional Encoding:** Implements **RoPE (Rotary Position Embedding)**, applied to half the embedding dimensions to preserve raw information.
+
+- **Duration Predictor & Alignment:**
+  
+  - Uses **Monotonic Alignment Search (MAS)** during training to align phonemes to mel-frames.
+  
+  - A Duration Predictor network learns log-durations from these alignments to be used during inference.
+
+### 2. The Decoder (Acoustic Generation)
+
+- **Flow Matching:** Replaces standard diffusion with OT-CFM. It predicts a vector field $v_t$ to guide simple noise $x_0$ to a complex mel-spectrogram $x_1$.
+
+- **1D U-Net Hybrid:** The decoder combines ResNet blocks (local features) with Transformer blocks (global context).
+
+- **SnakeBeta Activation:** A key innovation found by the author is the use of SnakeBeta activation in Feed-Forward layers, which is periodic and better suited for audio waveform generation than ReLU.
+
+---
+
+## Dataset and Preprocessing
+
+- **Dataset:** **LJ Speech** (approx. 24 hours of single-speaker English audio).
+
+- **Text Processing:** IPA phonemization via `espeak-ng` with interspersing (blank tokens) to stabilize MAS.
+
+- **Audio Processing:**
+  
+  - Sample Rate: 22,050 Hz.
+  
+  - STFT: 1024 FFT size, 256 hop length.
+  
+  - **Normalization:** Mel-spectrograms are normalized using dataset statistics. **This was found to be critical for training stability**.
+
+---
+
+## Experimental Results
+
+We compared the Original Paper's reported results against our **Re-implementation (Original)** and a **Custom Variation**. All models were trained for 150 epochs on a 4-GPU cluster.
+
+Quantitative Analysis
+
+| **Metric**             | **Matcha (Paper)** | **Matcha (Retested)** | **Custom (Ours)**     |
+| ---------------------- | ------------------ | --------------------- | --------------------- |
+| **Parameters**         | 18.2M              | 18.2M                 | 18.2M                 |
+| **RTF (GPU)**          | $0.038 \pm 0.019$  | **$0.019 \pm 0.008$** | **$0.018 \pm 0.008$** |
+| **WER (%)**            | 2.09               | $4.03 \pm 6.72$       | $5.64 \pm 8.45$       |
+| **Synthesis Time (s)** | -                  | $0.123 \pm 0.009$     | $0.110 \pm 0.007$     |
+
+Subjective Evaluation (MOS)
+
+*Mean Opinion Score evaluated by 31 participants.*
+
+| **Model**                      | **MOS (3 samples)** |
+| ------------------------------ | ------------------- |
+| **Matcha (Paper)**             | **$3.84 \pm 0.08$** |
+| **Original Re-implementation** | **$3.86 \pm 1.01$** |
+| **Our Custom Model**           | $3.04 \pm 1.23$     |
+
+### Key Findings
+
+1. **Reproducibility:** Our re-implementation achieves a MOS of 3.86, virtually identical to the original paper's 3.84, confirming successful reproduction of audio quality.
+
+2. **Efficiency:** Our implementations achieved an RTF of ~0.019, performing faster than the paper's reported 0.03829. Synthesis time scales quasi-linearly with text length.
+
+3. **Critical Challenge:** We identified that **Mel Spectrogram Normalization** is mandatory. An initial version without it failed to converge, resulting in extremely high loss and artifacts.
+
+---
+
+## Implementation Details
+
+### Versions Developed
+
+1. **18M Parameter (Main):** The primary version used for all final results. Stable training and high quality. it is the current main branch.
+
+2. **16M Parameter (Simplified):** A version with simplified transformer blocks in the decoder. It achieved comparable training dynamics to the 18M version.
+
+3. **18M Parameter (from-scratch):** A version with our own implementation of all fundamental modules (For example : Attention blocks and other modules found in the difusion library). It achieved worse results than the other versions. This version can be found in the ZedBranch2 branch.
+
+---
 
 ## References
 
-[![GitHub license](https://img.shields.io/github/license/shivammehta25/Matcha-TTS)](https://github.com/shivammehta25/Matcha-TTS/blob/main/LICENSE)  
-[![Paper](https://img.shields.io/badge/arXiv-2309.03199-b31b1b.svg)](https://arxiv.org/abs/2309.03199)  
-[![Official Repo](https://img.shields.io/badge/GitHub-Official%20Repo-blue.svg)](https://github.com/shivammehta25/Matcha-TTS)
+1. **Original Paper:** Mehta, S., et al. "Matcha-TTS: A fast TTS architecture with conditional flow matching." arXiv:2309.03199 (2023).
 
-- **Paper**: Mehta, S., et al. "Matcha-TTS: A fast TTS architecture with conditional flow matching." arXiv preprint arXiv:2309.03199 (2023).
-- **Official Repository**: [shivammehta25/Matcha-TTS](https://github.com/shivammehta25/Matcha-TTS)
-- **Demo**: [Hugging Face Space](https://huggingface.co/spaces/shivkanthb/Matcha-TTS)
-- **Wiki/FAQs**: [Official Wiki](https://github.com/shivammehta25/Matcha-TTS/wiki)
+2. **Implementation Report:** Adjal, M., Bouhai, Y., Bouhadjira, Z., Boularas, M.M. "MatchaTTS Implementation And Analysis." Sorbonne Université (2025-2026).
