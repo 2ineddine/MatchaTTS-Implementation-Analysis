@@ -6,7 +6,7 @@
 
 - Yasser Bouhai
 
-- Zineddine Bouhadjira
+- Zineddine 
 
 - Mohamed Mouad Boularas
 
@@ -118,5 +118,6 @@ Subjective Evaluation (MOS)
 ## References
 
 1. **Original Paper:** Mehta, S., et al. "Matcha-TTS: A fast TTS architecture with conditional flow matching." arXiv:2309.03199 (2023).
+
 
 2. **Implementation Report:** Adjal, M., Bouhai, Y., Bouhadjira, Z., Boularas, M.M. "MatchaTTS Implementation And Analysis." Sorbonne Université (2025-2026).
