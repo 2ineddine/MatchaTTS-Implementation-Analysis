@@ -2,7 +2,7 @@
 
 **Authors:**
 
-- Massyl Adjal (Project Lead & Coordinator)
+- Massyl Adjal (Project Lead)
 
 - Yasser Bouhai
 
@@ -28,6 +28,13 @@ We present a complete re-implementation of the model, featuring a Transformer-ba
 
 ## Architecture
 
+<p align="center">
+  <img src="figures/Pasted image.png" width="100%" />
+</p>
+<p align="center">
+  <em>MatchaTTS Architecture</em>
+</p>
+
 The system functions sequentially through two main subsystems:
 
 ### 1. The Encoder (Text Processing)
@@ -37,18 +44,46 @@ The system functions sequentially through two main subsystems:
   - **Preprocessing:** Uses 1D convolutions (Prenet) for local feature extraction.
   
   - **Positional Encoding:** Implements **RoPE (Rotary Position Embedding)**, applied to half the embedding dimensions to preserve raw information.
+    
+    <p align="center">
+      <img src="figures/Encoder.png" width="30%" />
+    </p>
+    <p align="center">
+      <em>Text Encoder architecture inspired by Glow-TTS and Grad-TTS. The text is first tokenized, then processed by a Prenet before being enriched by transformer layers with RoPE.</em>
+    </p>
 
 - **Duration Predictor & Alignment:**
   
   - Uses **Monotonic Alignment Search (MAS)** during training to align phonemes to mel-frames.
   
   - A Duration Predictor network learns log-durations from these alignments to be used during inference.
+    
+    <p align="center">
+      <img src="figures/MAS_algo.png" width="100%" />
+    </p>
+    <p align="center">
+      <em>MAS algorithm</em>
+    </p>
 
 ### 2. The Decoder (Acoustic Generation)
 
 - **Flow Matching:** Replaces standard diffusion with OT-CFM. It predicts a vector field $v_t$ to guide simple noise $x_0$ to a complex mel-spectrogram $x_1$.
+  
+  <p align="center">
+    <img src="figures/flow_matching.png" width="90%" />
+  </p>
+  <p align="center">
+    <em>Overview of the Training (CFM) and Inference (ODE) algorithms implemented in our code.</em>
+  </p>
 
 - **1D U-Net Hybrid:** The decoder combines ResNet blocks (local features) with Transformer blocks (global context).
+  
+  <p align="center">
+    <img src="figures/unet.png" width="80%" />
+  </p>
+  <p align="center">
+    <em>The 1D U-Net architecture structure implemented in <code>decoder.py</code>.</em>
+  </p>
 
 - **SnakeBeta Activation:** A key innovation found by the author is the use of SnakeBeta activation in Feed-Forward layers, which is periodic and better suited for audio waveform generation than ReLU.
 
@@ -67,6 +102,13 @@ The system functions sequentially through two main subsystems:
   - STFT: 1024 FFT size, 256 hop length.
   
   - **Normalization:** Mel-spectrograms are normalized using dataset statistics. **This was found to be critical for training stability**.
+    
+    <p align="center">
+      <img src="figures/mel_example.png" width="80%" />
+    </p>
+    <p align="center">
+      <em>Example of a normalized Mel-spectrogram target.</em>
+    </p>
 
 ---
 
@@ -93,6 +135,13 @@ Subjective Evaluation (MOS)
 | **Original Re-implementation** | **$3.86 \pm 1.01$** |
 | **Our Custom Model**           | $3.04 \pm 1.23$     |
 
+<p align="center">
+  <img src="figures/char_count_vs_synthesis_time.png" width="90%" />
+</p>
+<p align="center">
+  <em>Synthesis time as a function of character count. Points represent individual samples, while trend curves show the average behavior of models. A quasi-linear relationship is observed, with constant overhead dominating for short texts.</em>
+</p>
+
 ### Key Findings
 
 1. **Reproducibility:** Our re-implementation achieves a MOS of 3.86, virtually identical to the original paper's 3.84, confirming successful reproduction of audio quality.
@@ -112,6 +161,16 @@ Subjective Evaluation (MOS)
 2. **16M Parameter (Simplified):** A version with simplified transformer blocks in the decoder. It achieved comparable training dynamics to the 18M version.
 
 3. **18M Parameter (from-scratch):** A version with our own implementation of all fundamental modules (For example : Attention blocks and other modules found in the difusion library). It achieved worse results than the other versions. This version can be found in the ZedBranch2 branch.
+   
+   | Validation Loss                               | Prior Loss                                            |
+   |:---------------------------------------------:|:-----------------------------------------------------:|
+   | <img src="figures/val_loss.png" width="100%"> | <img src="figures/train_prior_loss.png" width="100%"> |
+   | **Duration Loss**                             | **Diffusion/Flow Loss**                               |
+   | <img src="figures/dur_loss.png" width="100%"> | <img src="figures/diff_loss.png" width="100%">        |
+   
+   <p align="center">
+     <em>Training curves comparing 16M (pink) and 18M (orange) implementations. All losses show similar convergence patterns.</em>
+   </p>
 
 ---
 
@@ -119,5 +178,4 @@ Subjective Evaluation (MOS)
 
 1. **Original Paper:** Mehta, S., et al. "Matcha-TTS: A fast TTS architecture with conditional flow matching." arXiv:2309.03199 (2023).
 
-
-2. **Implementation Report:** Adjal, M., Bouhai, Y., Bouhadjira, Z., Boularas, M.M. "MatchaTTS Implementation And Analysis." Sorbonne Université (2025-2026).
+2. **Implementation Report:** Adjal M., Bouhai Y., B. Z., Boularas M.M. "MatchaTTS Implementation And Analysis." Sorbonne Université (2025-2026).
